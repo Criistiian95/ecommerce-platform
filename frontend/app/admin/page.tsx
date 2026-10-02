@@ -10,7 +10,10 @@ type Product = {
   price: string;
   currentStock: number;
   minimumStock: number;
-  category?: { name?: string } | null;
+  imageUrl?: string | null;
+  active: boolean;
+  categoryId?: string | null;
+  category?: { id?: string; name?: string } | null;
 };
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3003';
@@ -20,9 +23,15 @@ export default function AdminPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [message, setMessage] = useState('');
+  const [editing, setEditing] = useState<Product | null>(null);
+
   const authHeaders = useMemo(
     () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }),
     [token],
+  );
+
+  const lowStock = products.filter(
+    product => product.active && product.currentStock <= product.minimumStock,
   );
 
   async function refresh(currentToken = token) {
@@ -32,10 +41,12 @@ export default function AdminPage() {
       fetch(`${API}/admin/catalog/categories`, { headers }),
       fetch(`${API}/admin/catalog/products`, { headers }),
     ]);
+
     if (!catRes.ok || !prodRes.ok) {
       setMessage('No se pudo cargar el panel. Revisá el acceso del usuario.');
       return;
     }
+
     setCategories(await catRes.json());
     setProducts(await prodRes.json());
   }
@@ -74,13 +85,50 @@ export default function AdminPage() {
         categoryId: form.get('categoryId') || null,
         currentStock: Number(form.get('currentStock') || 0),
         minimumStock: Number(form.get('minimumStock') || 0),
+        imageUrl: form.get('imageUrl') || null,
       }),
     });
+
     setMessage(response.ok ? 'Producto creado.' : 'No se pudo crear el producto.');
     if (response.ok) {
       event.currentTarget.reset();
       await refresh();
     }
+  }
+
+  async function saveProduct(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editing) return;
+
+    const form = new FormData(event.currentTarget);
+    const response = await fetch(`${API}/admin/catalog/products/${editing.id}`, {
+      method: 'PATCH',
+      headers: authHeaders,
+      body: JSON.stringify({
+        sku: form.get('sku'),
+        name: form.get('name'),
+        price: Number(form.get('price')),
+        categoryId: form.get('categoryId') || null,
+        minimumStock: Number(form.get('minimumStock') || 0),
+        imageUrl: form.get('imageUrl') || null,
+      }),
+    });
+
+    setMessage(response.ok ? 'Producto actualizado.' : 'No se pudo actualizar el producto.');
+    if (response.ok) {
+      setEditing(null);
+      await refresh();
+    }
+  }
+
+  async function setActive(product: Product, active: boolean) {
+    const response = await fetch(`${API}/admin/catalog/products/${product.id}/active`, {
+      method: 'PATCH',
+      headers: authHeaders,
+      body: JSON.stringify({ active }),
+    });
+    setMessage(response.ok ? (active ? 'Producto activado.' : 'Producto desactivado.') : 'No se pudo cambiar el estado.');
+    if (response.ok) await refresh();
   }
 
   async function adjustStock(productId: string, delta: number) {
@@ -116,9 +164,23 @@ export default function AdminPage() {
         <a className="btn secondary" href="/">Ver tienda</a>
       </header>
 
-      {message && <p>{message}</p>}
+      {message && <p className="notice">{message}</p>}
 
-      <section className="cards" style={{gridTemplateColumns:'1fr 2fr'}}>
+      <section className="summary-grid">
+        <article className="card"><strong>{products.length}</strong><span>Productos</span></article>
+        <article className="card"><strong>{products.filter(p => p.active).length}</strong><span>Activos</span></article>
+        <article className={`card ${lowStock.length ? 'warning-card' : ''}`}>
+          <strong>{lowStock.length}</strong><span>Stock bajo</span>
+        </article>
+      </section>
+
+      {lowStock.length > 0 && (
+        <section className="low-stock-banner">
+          <strong>Atención:</strong> {lowStock.length} producto(s) llegaron al stock mínimo o están por debajo.
+        </section>
+      )}
+
+      <section className="cards admin-two-columns">
         <article className="card">
           <h2>Nueva categoría</h2>
           <form onSubmit={createCategory}>
@@ -145,33 +207,82 @@ export default function AdminPage() {
               </label>
               <label className="field">Stock inicial<input name="currentStock" type="number" min="0" defaultValue="0" /></label>
               <label className="field">Stock mínimo<input name="minimumStock" type="number" min="0" defaultValue="0" /></label>
+              <label className="field full-field">URL de imagen<input name="imageUrl" type="url" placeholder="https://..." /></label>
             </div>
             <button className="btn primary" type="submit">Crear producto</button>
           </form>
         </article>
       </section>
 
+      {editing && (
+        <section className="card edit-card">
+          <div className="section-head">
+            <div>
+              <h2>Editar producto</h2>
+              <p>{editing.name}</p>
+            </div>
+            <button className="btn secondary" onClick={() => setEditing(null)}>Cancelar</button>
+          </div>
+          <form onSubmit={saveProduct}>
+            <div className="admin-grid">
+              <label className="field">SKU<input name="sku" defaultValue={editing.sku} required /></label>
+              <label className="field">Nombre<input name="name" defaultValue={editing.name} required /></label>
+              <label className="field">Precio<input name="price" type="number" min="0" step="0.01" defaultValue={editing.price} required /></label>
+              <label className="field">Categoría
+                <select name="categoryId" defaultValue={editing.categoryId ?? editing.category?.id ?? ''}>
+                  <option value="">Sin categoría</option>
+                  {categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
+                </select>
+              </label>
+              <label className="field">Stock mínimo<input name="minimumStock" type="number" min="0" defaultValue={editing.minimumStock} /></label>
+              <label className="field">URL de imagen<input name="imageUrl" type="url" defaultValue={editing.imageUrl ?? ''} /></label>
+            </div>
+            <button className="btn primary" type="submit">Guardar cambios</button>
+          </form>
+        </section>
+      )}
+
       <section className="card" style={{marginTop:24}}>
         <h2>Productos</h2>
         <div style={{overflowX:'auto'}}>
           <table className="admin-table">
             <thead>
-              <tr><th>SKU</th><th>Producto</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Mínimo</th><th>Ajustar</th></tr>
+              <tr>
+                <th>Producto</th><th>Categoría</th><th>Precio</th><th>Stock</th>
+                <th>Estado</th><th>Ajustar stock</th><th>Acciones</th>
+              </tr>
             </thead>
             <tbody>
-              {products.map(product => (
-                <tr key={product.id}>
-                  <td>{product.sku}</td>
-                  <td>{product.name}</td>
-                  <td>{product.category?.name ?? '-'}</td>
-                  <td>$ {Number(product.price).toLocaleString('es-AR')}</td>
-                  <td>{product.currentStock}</td>
-                  <td>{product.minimumStock}</td>
-                  <td>
-                    <StockAdjuster onAdjust={(delta) => adjustStock(product.id, delta)} />
-                  </td>
-                </tr>
-              ))}
+              {products.map(product => {
+                const isLow = product.active && product.currentStock <= product.minimumStock;
+                return (
+                  <tr key={product.id} className={isLow ? 'low-stock-row' : product.active ? '' : 'inactive-row'}>
+                    <td>
+                      <div className="product-cell">
+                        {product.imageUrl ? <img src={product.imageUrl} alt="" className="product-thumb" /> : <div className="product-placeholder">IMG</div>}
+                        <div><strong>{product.name}</strong><small>{product.sku}</small></div>
+                      </div>
+                    </td>
+                    <td>{product.category?.name ?? '-'}</td>
+                    <td>$ {Number(product.price).toLocaleString('es-AR')}</td>
+                    <td>
+                      <strong>{product.currentStock}</strong>
+                      <small className="stock-min">mín. {product.minimumStock}</small>
+                      {isLow && <span className="stock-badge">Stock bajo</span>}
+                    </td>
+                    <td><span className={product.active ? 'status-active' : 'status-inactive'}>{product.active ? 'Activo' : 'Inactivo'}</span></td>
+                    <td><StockAdjuster onAdjust={(delta) => adjustStock(product.id, delta)} /></td>
+                    <td>
+                      <div className="row-actions">
+                        <button className="btn secondary" onClick={() => setEditing(product)}>Editar</button>
+                        <button className="btn secondary" onClick={() => setActive(product, !product.active)}>
+                          {product.active ? 'Desactivar' : 'Activar'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
