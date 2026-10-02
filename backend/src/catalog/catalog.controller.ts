@@ -46,6 +46,33 @@ export class CatalogController {
     return this.catalog.createProduct(req.auth!.commerceId, req.auth!.userId, body);
   }
 
+  @Patch('products/:id')
+  updateProduct(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body()
+    body: {
+      sku?: string;
+      name?: string;
+      description?: string | null;
+      price?: number;
+      categoryId?: string | null;
+      minimumStock?: number;
+      imageUrl?: string | null;
+    },
+  ) {
+    return this.catalog.updateProduct(req.auth!.commerceId, id, body);
+  }
+
+  @Patch('products/:id/active')
+  setProductActive(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() body: { active: boolean },
+  ) {
+    return this.catalog.setProductActive(req.auth!.commerceId, id, body.active);
+  }
+
   @Patch('products/:id/stock')
   adjustStock(
     @Req() req: AuthenticatedRequest,
