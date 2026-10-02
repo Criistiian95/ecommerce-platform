@@ -44,7 +44,7 @@ export class CatalogService {
     return Product.findAll({
       where,
       include: [{ model: Category, as: 'category', required: false }],
-      order: [['createdAt', 'DESC']],
+      order: [['active', 'DESC'], ['createdAt', 'DESC']],
     });
   }
 
@@ -103,6 +103,60 @@ export class CatalogService {
       });
     }
 
+    return product;
+  }
+
+  async updateProduct(
+    commerceId: string | null,
+    productId: string,
+    input: {
+      sku?: string;
+      name?: string;
+      description?: string | null;
+      price?: number;
+      categoryId?: string | null;
+      minimumStock?: number;
+      imageUrl?: string | null;
+    },
+  ) {
+    const cid = this.requireCommerce(commerceId);
+    const product = await Product.findOne({ where: { id: productId, commerceId: cid } });
+    if (!product) throw new NotFoundException('Producto no encontrado');
+
+    if (input.categoryId) {
+      const category = await Category.findOne({ where: { id: input.categoryId, commerceId: cid } });
+      if (!category) throw new BadRequestException('Categoría inválida');
+    }
+
+    if (input.price !== undefined && (!Number.isFinite(Number(input.price)) || Number(input.price) < 0)) {
+      throw new BadRequestException('Precio inválido');
+    }
+
+    if (
+      input.minimumStock !== undefined &&
+      (!Number.isInteger(Number(input.minimumStock)) || Number(input.minimumStock) < 0)
+    ) {
+      throw new BadRequestException('Stock mínimo inválido');
+    }
+
+    await product.update({
+      ...(input.sku !== undefined ? { sku: input.sku.trim() } : {}),
+      ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+      ...(input.description !== undefined ? { description: input.description?.trim() || null } : {}),
+      ...(input.price !== undefined ? { price: Number(input.price) } : {}),
+      ...(input.categoryId !== undefined ? { categoryId: input.categoryId || null } : {}),
+      ...(input.minimumStock !== undefined ? { minimumStock: Number(input.minimumStock) } : {}),
+      ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl?.trim() || null } : {}),
+    });
+
+    return product;
+  }
+
+  async setProductActive(commerceId: string | null, productId: string, active: boolean) {
+    const cid = this.requireCommerce(commerceId);
+    const product = await Product.findOne({ where: { id: productId, commerceId: cid } });
+    if (!product) throw new NotFoundException('Producto no encontrado');
+    await product.update({ active: Boolean(active) });
     return product;
   }
 
