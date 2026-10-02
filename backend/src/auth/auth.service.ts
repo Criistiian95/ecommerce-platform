@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
 import { DatabaseService } from '../database/database.service';
 import { User } from '../database/models/user.model';
@@ -18,7 +18,7 @@ export class AuthService {
     if (!valid) throw new UnauthorizedException('Credenciales inválidas');
 
     const sessionId = randomUUID();
-    const expiresIn = process.env.JWT_EXPIRES_IN ?? '8h';
+    const expiresIn = (process.env.JWT_EXPIRES_IN ?? '8h') as SignOptions['expiresIn'];
     const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
 
     await Session.create({
