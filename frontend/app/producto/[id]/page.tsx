@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { useCart } from '../../cart-context';
 import { API_URL, StoreProduct } from '../../storefront-types';
 import { COMMERCE_SLUG } from '../../storefront-config';
+import '../../tienda/store.module.css';
 
 export default function ProductDetailPage() {
   const params = useParams<{ id: string }>();
