@@ -1,4 +1,5 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import bcrypt from 'bcryptjs';
 import { Sequelize } from 'sequelize';
 import { Commerce } from './models/commerce.model';
 import { User } from './models/user.model';
@@ -81,12 +82,61 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     throw lastError;
   }
 
+  private async bootstrapDemoCommerce() {
+    if (process.env.BOOTSTRAP_DEMO !== 'true') return;
+
+    const commerceName = process.env.BOOTSTRAP_COMMERCE_NAME?.trim();
+    const commerceSlug = process.env.BOOTSTRAP_COMMERCE_SLUG?.trim();
+    const adminName = process.env.BOOTSTRAP_ADMIN_NAME?.trim();
+    const adminEmail = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase();
+    const adminPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD;
+
+    if (!commerceName || !commerceSlug || !adminName || !adminEmail || !adminPassword) {
+      throw new Error('Bootstrap demo variables are incomplete');
+    }
+
+    const [commerce] = await Commerce.findOrCreate({
+      where: { slug: commerceSlug },
+      defaults: {
+        name: commerceName,
+        slug: commerceSlug,
+        active: true,
+      },
+    });
+
+    const existingUser = await User.findOne({ where: { email: adminEmail } });
+    if (existingUser) {
+      if (existingUser.commerceId !== commerce.id || existingUser.role !== 'admin') {
+        await existingUser.update({
+          commerceId: commerce.id,
+          role: 'admin',
+          active: true,
+        });
+      }
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(adminPassword, 12);
+    await User.create({
+      commerceId: commerce.id,
+      email: adminEmail,
+      passwordHash,
+      name: adminName,
+      role: 'admin',
+      active: true,
+    });
+
+    console.log(`Demo commerce bootstrapped: ${commerceSlug}`);
+  }
+
   async onModuleInit() {
     await this.authenticateWithRetry();
 
     if (process.env.DB_SYNC === 'true') {
       await this.sequelize.sync();
     }
+
+    await this.bootstrapDemoCommerce();
   }
 
   async onModuleDestroy() {
