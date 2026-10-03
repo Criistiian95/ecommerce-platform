@@ -129,6 +129,18 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     console.log(`Demo commerce bootstrapped: ${commerceSlug}`);
   }
 
+  private async ensureProductImageColumns() {
+    const [imageDataColumns] = await this.sequelize.query("SHOW COLUMNS FROM products LIKE 'image_data'");
+    if ((imageDataColumns as unknown[]).length === 0) {
+      await this.sequelize.query("ALTER TABLE products ADD COLUMN image_data MEDIUMBLOB NULL AFTER image_url");
+    }
+
+    const [mimeColumns] = await this.sequelize.query("SHOW COLUMNS FROM products LIKE 'image_mime_type'");
+    if ((mimeColumns as unknown[]).length === 0) {
+      await this.sequelize.query("ALTER TABLE products ADD COLUMN image_mime_type VARCHAR(60) NULL AFTER image_data");
+    }
+  }
+
   async onModuleInit() {
     await this.authenticateWithRetry();
 
@@ -136,6 +148,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       await this.sequelize.sync();
     }
 
+    await this.ensureProductImageColumns();
     await this.bootstrapDemoCommerce();
   }
 
