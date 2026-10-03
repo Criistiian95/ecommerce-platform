@@ -7,6 +7,8 @@ import { Session } from './models/session.model';
 import { Category } from './models/category.model';
 import { Product } from './models/product.model';
 import { StockMovement } from './models/stock-movement.model';
+import { Order } from './models/order.model';
+import { OrderItem } from './models/order-item.model';
 
 @Injectable()
 export class DatabaseService implements OnModuleInit, OnModuleDestroy {
@@ -37,6 +39,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     Category.register(this.sequelize);
     Product.register(this.sequelize);
     StockMovement.register(this.sequelize);
+    Order.register(this.sequelize);
+    OrderItem.register(this.sequelize);
 
     Commerce.hasMany(User, { foreignKey: 'commerceId', as: 'users' });
     User.belongsTo(Commerce, { foreignKey: 'commerceId', as: 'commerce' });
@@ -56,6 +60,15 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     Product.hasMany(StockMovement, { foreignKey: 'productId', as: 'stockMovements' });
     StockMovement.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
     User.hasMany(StockMovement, { foreignKey: 'userId', as: 'stockMovements' });
+
+    Commerce.hasMany(Order, { foreignKey: 'commerceId', as: 'orders' });
+    Order.belongsTo(Commerce, { foreignKey: 'commerceId', as: 'commerce' });
+
+    Order.hasMany(OrderItem, { foreignKey: 'orderId', as: 'items' });
+    OrderItem.belongsTo(Order, { foreignKey: 'orderId', as: 'order' });
+
+    Product.hasMany(OrderItem, { foreignKey: 'productId', as: 'orderItems' });
+    OrderItem.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
   }
 
   private async wait(ms: number) {
