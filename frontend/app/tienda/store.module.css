@@ -76,3 +76,10 @@
 :global(.checkout-success-total){font-size:20px;margin-bottom:8px}
 @media(max-width:900px){:global(.checkout-layout){grid-template-columns:1fr}:global(.checkout-grid){grid-template-columns:1fr}}
 @media(max-width:640px){:global(.delivery-options){grid-template-columns:1fr}}
+
+:global(.payment-result-card){max-width:660px;margin:48px auto;background:#fff;border-radius:24px;padding:34px;text-align:center}
+:global(.payment-result-icon){width:58px;height:58px;margin:0 auto 16px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#fff1f1;color:#9b1c1c;font-size:28px;font-weight:900}
+:global(.payment-result-icon.success){background:#e7f7ee;color:#176b3a}
+:global(.payment-result-icon.pending){background:#fff4e5;color:#9a5a0a}
+:global(.payment-result-actions){display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:24px}
+:global(.payment-confirmation-note){margin-top:20px}
