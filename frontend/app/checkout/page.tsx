@@ -7,21 +7,11 @@ import { API_URL } from '../storefront-types';
 import { COMMERCE_SLUG } from '../storefront-config';
 import '../tienda/store.module.css';
 
-type CreatedOrder = {
-  id: string;
-  orderNumber: string;
-  status: string;
-  subtotal: number;
-  total: number;
-  deliveryMethod: 'pickup' | 'shipping';
-};
-
 export default function CheckoutPage() {
-  const { items, subtotal, clearCart } = useCart();
+  const { items, subtotal } = useCart();
   const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'shipping'>('pickup');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
-  const [createdOrder, setCreatedOrder] = useState<CreatedOrder | null>(null);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -59,31 +49,19 @@ export default function CheckoutPage() {
         return;
       }
 
-      setCreatedOrder(data.order);
-      clearCart();
+      const checkoutUrl = data?.payment?.checkoutUrl;
+      if (!checkoutUrl) {
+        setMessage('No se recibió la URL de pago de Mercado Pago.');
+        return;
+      }
+
+      localStorage.setItem('last_pending_order', data.order.id);
+      window.location.assign(checkoutUrl);
     } catch {
       setMessage('No se pudo conectar con el servidor.');
     } finally {
       setSaving(false);
     }
-  }
-
-  if (createdOrder) {
-    return (
-      <main className="store-shell">
-        <section className="checkout-success">
-          <div className="checkout-success-icon">✓</div>
-          <h1>Pedido recibido</h1>
-          <p>Tu pedido fue creado correctamente.</p>
-          <div className="order-number">{createdOrder.orderNumber}</div>
-          <div className="checkout-success-total">
-            Total: <strong>$ {createdOrder.total.toLocaleString('es-AR')}</strong>
-          </div>
-          <p className="checkout-muted">Estado inicial: pendiente.</p>
-          <Link href="/tienda" className="btn primary">Volver a la tienda</Link>
-        </section>
-      </main>
-    );
   }
 
   if (!items.length) {
@@ -103,7 +81,7 @@ export default function CheckoutPage() {
       <div className="checkout-layout">
         <section className="checkout-card">
           <h1>Finalizar compra</h1>
-          <p className="checkout-muted">Completá tus datos para generar el pedido.</p>
+          <p className="checkout-muted">Completá tus datos y luego te vamos a llevar a Mercado Pago.</p>
 
           {message && <div className="cart-alert">{message}</div>}
 
@@ -161,7 +139,7 @@ export default function CheckoutPage() {
             </label>
 
             <button className="btn primary checkout-submit" type="submit" disabled={saving}>
-              {saving ? 'Creando pedido...' : 'Confirmar pedido'}
+              {saving ? 'Preparando pago...' : 'Ir a pagar con Mercado Pago'}
             </button>
           </form>
         </section>
