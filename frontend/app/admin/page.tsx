@@ -11,12 +11,43 @@ type Product = {
   currentStock: number;
   minimumStock: number;
   imageUrl?: string | null;
+  description?: string | null;
+  hasUploadedImage?: boolean;
   active: boolean;
   categoryId?: string | null;
   category?: { id?: string; name?: string } | null;
 };
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3003';
+
+async function fileToBase64(file: File) {
+  if (file.size > 2 * 1024 * 1024) {
+    throw new Error('La imagen no puede superar 2 MB.');
+  }
+
+  const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!allowed.includes(file.type)) {
+    throw new Error('La imagen debe ser JPG, PNG o WebP.');
+  }
+
+  return await new Promise<{ data: string; mimeType: string }>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('No se pudo leer la imagen.'));
+    reader.onload = () => {
+      const result = String(reader.result ?? '');
+      const comma = result.indexOf(',');
+      if (comma === -1) {
+        reject(new Error('No se pudo procesar la imagen.'));
+        return;
+      }
+      resolve({
+        data: result.slice(comma + 1),
+        mimeType: file.type,
+      });
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function AdminPage() {
   const [token, setToken] = useState('');
@@ -113,17 +144,26 @@ export default function AdminPage() {
     setSavingProduct(true);
 
     try {
+      const imageFile = form.get('imageFile');
+      const uploaded =
+        imageFile instanceof File && imageFile.size > 0
+          ? await fileToBase64(imageFile)
+          : null;
+
       const response = await fetch(`${API}/admin/catalog/products`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
           sku: form.get('sku'),
           name: form.get('name'),
+          description: form.get('description') || null,
           price: Number(form.get('price')),
           categoryId: form.get('categoryId') || null,
           currentStock: Number(form.get('currentStock') || 0),
           minimumStock: Number(form.get('minimumStock') || 0),
-          imageUrl: form.get('imageUrl') || null,
+          imageUrl: uploaded ? null : (form.get('imageUrl') || null),
+          imageDataBase64: uploaded?.data ?? null,
+          imageMimeType: uploaded?.mimeType ?? null,
         }),
       });
 
@@ -153,16 +193,36 @@ export default function AdminPage() {
     if (!editing) return;
 
     const form = new FormData(event.currentTarget);
+    let uploaded: { data: string; mimeType: string } | null = null;
+
+    try {
+      const imageFile = form.get('imageFile');
+      uploaded =
+        imageFile instanceof File && imageFile.size > 0
+          ? await fileToBase64(imageFile)
+          : null;
+    } catch (error) {
+      setToast({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'No se pudo procesar la imagen.',
+      });
+      return;
+    }
+
     const response = await fetch(`${API}/admin/catalog/products/${editing.id}`, {
       method: 'PATCH',
       headers: authHeaders,
       body: JSON.stringify({
         sku: form.get('sku'),
         name: form.get('name'),
+        description: form.get('description') || null,
         price: Number(form.get('price')),
         categoryId: form.get('categoryId') || null,
         minimumStock: Number(form.get('minimumStock') || 0),
-        imageUrl: form.get('imageUrl') || null,
+        imageUrl: uploaded ? null : (form.get('imageUrl') || null),
+        imageDataBase64: uploaded?.data ?? null,
+        imageMimeType: uploaded?.mimeType ?? null,
+        clearUploadedImage: !uploaded && Boolean(form.get('imageUrl')),
       }),
     });
 
@@ -277,7 +337,17 @@ export default function AdminPage() {
               </label>
               <label className="field">Stock inicial<input name="currentStock" type="number" min="0" defaultValue="0" /></label>
               <label className="field">Stock mínimo<input name="minimumStock" type="number" min="0" defaultValue="0" /></label>
-              <label className="field full-field">URL de imagen<input name="imageUrl" type="url" placeholder="https://..." /></label>
+              <label className="field full-field">Descripción breve
+                <textarea name="description" rows={3} maxLength={300} placeholder="Descripción corta del producto" />
+              </label>
+              <label className="field full-field">Imagen (opcional)
+                <input name="imageFile" type="file" accept="image/jpeg,image/png,image/webp" />
+                <small>JPG, PNG o WebP. Máximo 2 MB.</small>
+              </label>
+              <div className="image-divider full-field"><span>o</span></div>
+              <label className="field full-field">URL de imagen (opcional)
+                <input name="imageUrl" type="url" placeholder="https://..." />
+              </label>
             </div>
             <button className="btn primary" type="submit" disabled={savingProduct}>{savingProduct ? 'Creando...' : 'Crear producto'}</button>
           </form>
@@ -305,7 +375,17 @@ export default function AdminPage() {
                 </select>
               </label>
               <label className="field">Stock mínimo<input name="minimumStock" type="number" min="0" defaultValue={editing.minimumStock} /></label>
-              <label className="field">URL de imagen<input name="imageUrl" type="url" defaultValue={editing.imageUrl ?? ''} /></label>
+              <label className="field full-field">Descripción breve
+                <textarea name="description" rows={3} maxLength={300} defaultValue={editing.description ?? ''} />
+              </label>
+              <label className="field full-field">Imagen nueva (opcional)
+                <input name="imageFile" type="file" accept="image/jpeg,image/png,image/webp" />
+                <small>Si elegís una foto, reemplaza la imagen actual.</small>
+              </label>
+              <div className="image-divider full-field"><span>o</span></div>
+              <label className="field full-field">URL de imagen (opcional)
+                <input name="imageUrl" type="url" defaultValue={editing.imageUrl ?? ''} placeholder="https://..." />
+              </label>
             </div>
             <button className="btn primary" type="submit">Guardar cambios</button>
           </form>
@@ -329,8 +409,18 @@ export default function AdminPage() {
                   <tr key={product.id} className={isLow ? 'low-stock-row' : product.active ? '' : 'inactive-row'}>
                     <td>
                       <div className="product-cell">
-                        {product.imageUrl ? <img src={product.imageUrl} alt="" className="product-thumb" /> : <div className="product-placeholder">IMG</div>}
-                        <div><strong>{product.name}</strong><small>{product.sku}</small></div>
+                        {product.hasUploadedImage ? (
+                          <img src={`${API}/catalog/products/${product.id}/image`} alt={product.name} className="product-thumb" />
+                        ) : product.imageUrl ? (
+                          <img src={product.imageUrl} alt={product.name} className="product-thumb" />
+                        ) : (
+                          <div className="product-placeholder">IMG</div>
+                        )}
+                        <div>
+                          <strong>{product.name}</strong>
+                          <small>{product.sku}</small>
+                          {product.description && <small className="product-description">{product.description}</small>}
+                        </div>
                       </div>
                     </td>
                     <td>{product.category?.name ?? '-'}</td>
