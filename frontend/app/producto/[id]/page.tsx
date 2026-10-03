@@ -31,6 +31,7 @@ export default function ProductDetailPage() {
     : product.imageUrl || null;
 
   async function add() {
+    if (!product) return;
     const result = await addProduct(product);
     setMessage(result.ok ? 'Agregado al carrito.' : (result.message ?? 'No se pudo agregar.'));
   }
