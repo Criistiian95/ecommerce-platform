@@ -11,6 +11,8 @@ export class Product extends Model {
   declare currentStock: number;
   declare minimumStock: number;
   declare imageUrl: string | null;
+  declare imageData: Buffer | null;
+  declare imageMimeType: string | null;
   declare active: boolean;
 
   static register(sequelize: Sequelize) {
@@ -64,6 +66,16 @@ export class Product extends Model {
           type: DataTypes.STRING(500),
           allowNull: true,
           field: 'image_url',
+        },
+        imageData: {
+          type: DataTypes.BLOB('medium'),
+          allowNull: true,
+          field: 'image_data',
+        },
+        imageMimeType: {
+          type: DataTypes.STRING(60),
+          allowNull: true,
+          field: 'image_mime_type',
         },
         active: {
           type: DataTypes.BOOLEAN,
