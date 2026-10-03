@@ -41,3 +41,9 @@
 .products-section{scroll-margin-top:22px}
 .btn:disabled{opacity:.6;cursor:not-allowed}
 @media(max-width:600px){.toast{left:16px;right:16px;min-width:0;max-width:none}}
+
+.field textarea{padding:13px;border:1px solid #d7dce2;border-radius:10px;background:#fff;font:inherit;resize:vertical}
+.field small{color:#667085;font-size:12px}
+.image-divider{display:flex;align-items:center;gap:12px;color:#98a2b3;font-size:12px}
+.image-divider::before,.image-divider::after{content:"";height:1px;background:#e5e7eb;flex:1}
+.product-description{max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
