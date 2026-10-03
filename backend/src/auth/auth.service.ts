@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
-import bcrypt from 'bcryptjs';
-import jwt, { SignOptions } from 'jsonwebtoken';
+import * as bcrypt from 'bcryptjs';
+import * as jwt from 'jsonwebtoken';
+import type { SignOptions } from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
 import { DatabaseService } from '../database/database.service';
 import { User } from '../database/models/user.model';
