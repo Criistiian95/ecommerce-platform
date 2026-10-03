@@ -41,6 +41,8 @@ export class CatalogController {
       currentStock?: number;
       minimumStock?: number;
       imageUrl?: string;
+      imageDataBase64?: string | null;
+      imageMimeType?: string | null;
     },
   ) {
     return this.catalog.createProduct(req.auth!.commerceId, req.auth!.userId, body);
@@ -59,6 +61,9 @@ export class CatalogController {
       categoryId?: string | null;
       minimumStock?: number;
       imageUrl?: string | null;
+      imageDataBase64?: string | null;
+      imageMimeType?: string | null;
+      clearUploadedImage?: boolean;
     },
   ) {
     return this.catalog.updateProduct(req.auth!.commerceId, id, body);
