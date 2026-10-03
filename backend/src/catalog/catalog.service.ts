@@ -31,6 +31,32 @@ export class CatalogService {
     });
   }
 
+  private decodeImage(input?: { imageDataBase64?: string | null; imageMimeType?: string | null }) {
+    const base64 = input?.imageDataBase64?.trim();
+    const mime = input?.imageMimeType?.trim().toLowerCase();
+
+    if (!base64) return null;
+
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!mime || !allowed.includes(mime)) {
+      throw new BadRequestException('Formato de imagen no permitido');
+    }
+
+    let buffer: Buffer;
+    try {
+      buffer = Buffer.from(base64, 'base64');
+    } catch {
+      throw new BadRequestException('Imagen inválida');
+    }
+
+    if (!buffer.length) throw new BadRequestException('Imagen inválida');
+    if (buffer.length > 2 * 1024 * 1024) {
+      throw new BadRequestException('La imagen no puede superar 2 MB');
+    }
+
+    return { buffer, mime };
+  }
+
   listProducts(commerceId: string | null, search?: string) {
     const cid = this.requireCommerce(commerceId);
     const where: any = { commerceId: cid };
@@ -43,6 +69,10 @@ export class CatalogService {
 
     return Product.findAll({
       where,
+      attributes: {
+        exclude: ['imageData'],
+        include: [[Product.sequelize!.literal('(image_data IS NOT NULL)'), 'hasUploadedImage']],
+      },
       include: [{ model: Category, as: 'category', required: false }],
       order: [['active', 'DESC'], ['createdAt', 'DESC']],
     });
@@ -60,6 +90,8 @@ export class CatalogService {
       currentStock?: number;
       minimumStock?: number;
       imageUrl?: string;
+      imageDataBase64?: string | null;
+      imageMimeType?: string | null;
     },
   ) {
     const cid = this.requireCommerce(commerceId);
@@ -76,6 +108,7 @@ export class CatalogService {
     }
 
     const initialStock = Math.max(0, Number(input.currentStock ?? 0));
+    const uploadedImage = this.decodeImage(input);
 
     const product = await Product.create({
       commerceId: cid,
@@ -86,7 +119,9 @@ export class CatalogService {
       price: Number(input.price),
       currentStock: initialStock,
       minimumStock: Math.max(0, Number(input.minimumStock ?? 0)),
-      imageUrl: input.imageUrl?.trim() || null,
+      imageUrl: uploadedImage ? null : (input.imageUrl?.trim() || null),
+      imageData: uploadedImage?.buffer ?? null,
+      imageMimeType: uploadedImage?.mime ?? null,
       active: true,
     });
 
@@ -117,6 +152,9 @@ export class CatalogService {
       categoryId?: string | null;
       minimumStock?: number;
       imageUrl?: string | null;
+      imageDataBase64?: string | null;
+      imageMimeType?: string | null;
+      clearUploadedImage?: boolean;
     },
   ) {
     const cid = this.requireCommerce(commerceId);
@@ -139,6 +177,8 @@ export class CatalogService {
       throw new BadRequestException('Stock mínimo inválido');
     }
 
+    const uploadedImage = this.decodeImage(input);
+
     await product.update({
       ...(input.sku !== undefined ? { sku: input.sku.trim() } : {}),
       ...(input.name !== undefined ? { name: input.name.trim() } : {}),
@@ -146,10 +186,31 @@ export class CatalogService {
       ...(input.price !== undefined ? { price: Number(input.price) } : {}),
       ...(input.categoryId !== undefined ? { categoryId: input.categoryId || null } : {}),
       ...(input.minimumStock !== undefined ? { minimumStock: Number(input.minimumStock) } : {}),
-      ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl?.trim() || null } : {}),
+      ...(uploadedImage
+        ? { imageUrl: null, imageData: uploadedImage.buffer, imageMimeType: uploadedImage.mime }
+        : {}),
+      ...(!uploadedImage && input.imageUrl !== undefined
+        ? { imageUrl: input.imageUrl?.trim() || null }
+        : {}),
+      ...(input.clearUploadedImage
+        ? { imageData: null, imageMimeType: null }
+        : {}),
     });
 
     return product;
+  }
+
+  async getProductImage(productId: string) {
+    const product = await Product.findByPk(productId, {
+      attributes: ['id', 'imageData', 'imageMimeType'],
+    });
+    if (!product?.imageData || !product.imageMimeType) {
+      throw new NotFoundException('Imagen no encontrada');
+    }
+    return {
+      data: product.imageData,
+      mimeType: product.imageMimeType,
+    };
   }
 
   async setProductActive(commerceId: string | null, productId: string, active: boolean) {
