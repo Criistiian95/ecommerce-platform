@@ -47,3 +47,12 @@
 .image-divider{display:flex;align-items:center;gap:12px;color:#98a2b3;font-size:12px}
 .image-divider::before,.image-divider::after{content:"";height:1px;background:#e5e7eb;flex:1}
 .product-description{max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.product-options{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.check-field{display:flex;align-items:center;gap:8px;font-weight:700}
+.check-field input{width:16px;height:16px}
+.price-stack{display:flex;flex-direction:column;gap:3px}
+.old-price{text-decoration:line-through;color:#98a2b3}
+.publication-cell{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.status-draft{display:inline-block;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:700;background:#fff4e5;color:#8a4b08}
+.featured-badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#eef4ff;color:#3448a3;font-size:11px;font-weight:700}
