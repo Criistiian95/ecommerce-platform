@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useCart } from '../cart-context';
 import { API_URL } from '../storefront-types';
+import '../tienda/store.module.css';
 
 export default function CartPage() {
   const { items, subtotal, setQuantity, removeProduct, clearCart } = useCart();
@@ -63,8 +64,8 @@ export default function CartPage() {
           <aside className="cart-summary">
             <h2>Resumen</h2>
             <div className="cart-summary-row"><span>Subtotal</span><strong>$ {subtotal.toLocaleString('es-AR')}</strong></div>
-            <button className="btn primary" disabled>Continuar compra</button>
-            <small>El checkout se agrega en el siguiente paso.</small>
+            <Link className="btn primary" href="/checkout">Continuar compra</Link>
+            <small>Vas a revisar tus datos antes de confirmar el pedido.</small>
           </aside>
         </div>
       )}
