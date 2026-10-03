@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { createHmac, timingSafeEqual, randomUUID } from 'crypto';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { Commerce } from '../database/models/commerce.model';
 import { Order } from '../database/models/order.model';
 import { OrderItem } from '../database/models/order-item.model';
@@ -7,22 +7,23 @@ import { Product } from '../database/models/product.model';
 import { StockMovement } from '../database/models/stock-movement.model';
 import { OrderEmailService } from './order-email.service';
 
-type MpOrderResponse = {
+type MpPreferenceResponse = {
   id: string;
+  init_point?: string;
+  sandbox_init_point?: string;
+  external_reference?: string;
+};
+
+type MpPayment = {
+  id: number | string;
   status: string;
   status_detail?: string;
-  checkout_url?: string;
-  total_amount?: string;
-  total_paid_amount?: string;
-  external_reference?: string;
-  transactions?: {
-    payments?: Array<{
-      id?: string;
-      status?: string;
-      status_detail?: string;
-      paid_amount?: string;
-    }>;
-  };
+  transaction_amount?: number;
+  external_reference?: string | null;
+};
+
+type MpPaymentSearch = {
+  results?: MpPayment[];
 };
 
 @Injectable()
@@ -42,81 +43,58 @@ export class MercadoPagoService {
     const frontendUrl = (process.env.FRONTEND_URL ?? '').replace(/\/$/, '');
     if (!frontendUrl) throw new Error('FRONTEND_URL is not configured');
 
-    const total = Number(order.total).toFixed(2);
-    const response = await fetch('https://api.mercadopago.com/v1/orders', {
+    const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.accessToken()}`,
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        'X-Idempotency-Key': randomUUID(),
       },
       body: JSON.stringify({
-        type: 'online',
-        processing_mode: 'manual',
-        capture_mode: 'automatic_async',
-        total_amount: total,
-        external_reference: order.id,
-        description: `Pedido ${order.orderNumber}`,
-        expiration_time: 'PT30M',
-        payer: {
-          email: order.customerEmail,
-        },
         items: items.map(item => ({
           title: item.title,
           quantity: item.quantity,
-          unit_price: item.unitPrice.toFixed(2),
-          total_amount: (item.unitPrice * item.quantity).toFixed(2),
-          unit_measure: 'unit',
+          unit_price: Number(item.unitPrice.toFixed(2)),
+          currency_id: 'ARS',
         })),
-        config: {
-          online: {
-            success_url: `${frontendUrl}/pago/resultado?result=success&order=${order.id}`,
-            failure_url: `${frontendUrl}/pago/resultado?result=failure&order=${order.id}`,
-            pending_url: `${frontendUrl}/pago/resultado?result=pending&order=${order.id}`,
-            auto_return: 'all',
-          },
+        payer: {
+          email: order.customerEmail,
         },
+        external_reference: order.id,
+        statement_descriptor: 'ECOMMERCE',
+        back_urls: {
+          success: `${frontendUrl}/pago/resultado?result=success&order=${order.id}`,
+          failure: `${frontendUrl}/pago/resultado?result=failure&order=${order.id}`,
+          pending: `${frontendUrl}/pago/resultado?result=pending&order=${order.id}`,
+        },
+        auto_return: 'approved',
+        expires: true,
+        expiration_date_to: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       }),
     });
 
-    const data = await response.json().catch(() => null) as MpOrderResponse | null;
-    if (!response.ok || !data?.id || !data.checkout_url) {
+    const data = await response.json().catch(() => null) as MpPreferenceResponse | null;
+
+    const token = this.accessToken();
+    const checkoutUrl = token.startsWith('TEST-')
+      ? data?.sandbox_init_point ?? data?.init_point
+      : data?.init_point;
+
+    if (!response.ok || !data?.id || !checkoutUrl) {
       throw new Error(
-        `Mercado Pago order creation failed (${response.status}): ${JSON.stringify(data)}`,
+        `Mercado Pago preference creation failed (${response.status}): ${JSON.stringify(data)}`,
       );
     }
 
     await order.update({
       mpOrderId: data.id,
-      mpCheckoutUrl: data.checkout_url,
+      mpCheckoutUrl: checkoutUrl,
     });
 
     return {
       mpOrderId: data.id,
-      checkoutUrl: data.checkout_url,
+      checkoutUrl,
     };
-  }
-
-  async fetchOrder(mpOrderId: string) {
-    const response = await fetch(
-      `https://api.mercadopago.com/v1/orders/${encodeURIComponent(mpOrderId)}`,
-      {
-        headers: {
-          Authorization: `Bearer ${this.accessToken()}`,
-          Accept: 'application/json',
-        },
-      },
-    );
-
-    const data = await response.json().catch(() => null) as MpOrderResponse | null;
-    if (!response.ok || !data?.id) {
-      throw new Error(
-        `Mercado Pago order lookup failed (${response.status}): ${JSON.stringify(data)}`,
-      );
-    }
-
-    return data;
   }
 
   validateWebhookSignature(
@@ -151,46 +129,75 @@ export class MercadoPagoService {
     }
   }
 
-  async processOrderNotification(mpOrderId: string) {
-    const mpOrder = await this.fetchOrder(mpOrderId);
-    const order = await Order.findOne({
-      where: { mpOrderId: mpOrder.id },
-      include: [{ model: OrderItem, as: 'items' }],
+  private async fetchPayment(paymentId: string) {
+    const response = await fetch(
+      `https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${this.accessToken()}`,
+          Accept: 'application/json',
+        },
+      },
+    );
+
+    const data = await response.json().catch(() => null) as MpPayment | null;
+    if (!response.ok || !data?.id) {
+      throw new Error(
+        `Mercado Pago payment lookup failed (${response.status}): ${JSON.stringify(data)}`,
+      );
+    }
+
+    return data;
+  }
+
+  private async searchPayments(orderId: string) {
+    const params = new URLSearchParams({
+      external_reference: orderId,
+      sort: 'date_created',
+      criteria: 'desc',
     });
 
+    const response = await fetch(
+      `https://api.mercadopago.com/v1/payments/search?${params.toString()}`,
+      {
+        headers: {
+          Authorization: `Bearer ${this.accessToken()}`,
+          Accept: 'application/json',
+        },
+      },
+    );
+
+    const data = await response.json().catch(() => null) as MpPaymentSearch | null;
+    if (!response.ok) {
+      throw new Error(
+        `Mercado Pago payment search failed (${response.status}): ${JSON.stringify(data)}`,
+      );
+    }
+
+    return data?.results ?? [];
+  }
+
+  async processPaymentNotification(paymentId: string) {
+    const payment = await this.fetchPayment(paymentId);
+    const orderId = payment.external_reference;
+    if (!orderId) return;
+
+    const order = await Order.findByPk(orderId);
     if (!order) {
-      console.warn('Mercado Pago webhook ignored: local order not found', mpOrder.id);
+      console.warn('Mercado Pago payment ignored: local order not found', orderId);
       return;
     }
 
-    const paidAmount = Number(mpOrder.total_paid_amount ?? 0);
+    const amount = Number(payment.transaction_amount ?? 0);
     const expectedAmount = Number(order.total);
-    const isAccredited =
-      mpOrder.status === 'processed' &&
-      (mpOrder.status_detail === 'accredited' ||
-        mpOrder.transactions?.payments?.some(
-          payment =>
-            payment.status === 'processed' &&
-            payment.status_detail === 'accredited',
-        ));
 
-    if (isAccredited && paidAmount >= expectedAmount) {
+    if (payment.status === 'approved' && amount >= expectedAmount) {
       await this.confirmPaidOrder(order);
       return;
     }
 
-    if (mpOrder.status === 'refunded') {
+    if (payment.status === 'refunded') {
       await order.update({ paymentStatus: 'refunded' });
-      return;
-    }
-
-    if (mpOrder.status === 'failed') {
-      await this.releaseReservation(order, 'rejected');
-      return;
-    }
-
-    if (mpOrder.status === 'canceled' || mpOrder.status === 'expired') {
-      await this.releaseReservation(order, 'cancelled');
     }
   }
 
@@ -198,11 +205,13 @@ export class MercadoPagoService {
     if (order.paymentStatus === 'paid') return;
 
     const transaction = await Order.sequelize!.transaction();
+
     try {
       const lockedOrder = await Order.findByPk(order.id, {
         transaction,
         lock: transaction.LOCK.UPDATE,
       });
+
       if (!lockedOrder || lockedOrder.paymentStatus === 'paid') {
         await transaction.rollback();
         return;
@@ -237,7 +246,9 @@ export class MercadoPagoService {
       const commerce = await Commerce.findByPk(lockedOrder.commerceId, {
         attributes: ['name'],
       });
-      const items = await OrderItem.findAll({ where: { orderId: lockedOrder.id } });
+      const items = await OrderItem.findAll({
+        where: { orderId: lockedOrder.id },
+      });
 
       if (commerce) {
         void this.orderEmail.sendConfirmation({
@@ -271,6 +282,7 @@ export class MercadoPagoService {
     if (order.paymentStatus !== 'pending' || order.status !== 'pending_payment') return;
 
     const transaction = await Order.sequelize!.transaction();
+
     try {
       const lockedOrder = await Order.findByPk(order.id, {
         transaction,
@@ -296,11 +308,14 @@ export class MercadoPagoService {
           transaction,
           lock: transaction.LOCK.UPDATE,
         });
+
         if (!product) continue;
 
         const previousStock = product.currentStock;
         const newStock = previousStock + item.quantity;
+
         await product.update({ currentStock: newStock }, { transaction });
+
         await StockMovement.create(
           {
             commerceId: lockedOrder.commerceId,
@@ -343,12 +358,21 @@ export class MercadoPagoService {
     });
     if (!order) return null;
 
-    if (order.paymentStatus === 'pending' && order.mpOrderId) {
+    if (order.paymentStatus === 'pending') {
       try {
-        await this.processOrderNotification(order.mpOrderId);
-        order = (await Order.findByPk(order.id)) ?? order;
+        const payments = await this.searchPayments(order.id);
+        const approved = payments.find(
+          payment =>
+            payment.status === 'approved' &&
+            Number(payment.transaction_amount ?? 0) >= Number(order!.total),
+        );
+
+        if (approved) {
+          await this.processPaymentNotification(String(approved.id));
+          order = (await Order.findByPk(order.id)) ?? order;
+        }
       } catch (error) {
-        console.error('Could not refresh Mercado Pago order status', error);
+        console.error('Could not refresh Mercado Pago payment status', error);
       }
     }
 
