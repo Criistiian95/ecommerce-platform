@@ -3,6 +3,7 @@ import type { Response } from 'express';
 import { CatalogService } from './catalog.service';
 import { PublicCatalogService } from './public-catalog.service';
 import { PublicCartService } from './public-cart.service';
+import { PublicCheckoutService } from './public-checkout.service';
 
 @Controller('catalog')
 export class CatalogPublicController {
@@ -10,6 +11,7 @@ export class CatalogPublicController {
     private readonly catalog: CatalogService,
     private readonly publicCatalog: PublicCatalogService,
     private readonly publicCart: PublicCartService,
+    private readonly publicCheckout: PublicCheckoutService,
   ) {}
 
   @Get('store/:slug')
@@ -28,6 +30,26 @@ export class CatalogPublicController {
     @Body() body: { items?: Array<{ productId: string; quantity: number }> },
   ) {
     return this.publicCart.validateCart(slug, body.items ?? []);
+  }
+
+  @Post('store/:slug/checkout')
+  checkout(
+    @Param('slug') slug: string,
+    @Body()
+    body: {
+      customerName: string;
+      customerEmail: string;
+      customerPhone: string;
+      deliveryMethod: 'pickup' | 'shipping';
+      address?: string | null;
+      notes?: string | null;
+      items?: Array<{ productId: string; quantity: number }>;
+    },
+  ) {
+    return this.publicCheckout.createOrder(slug, {
+      ...body,
+      items: body.items ?? [],
+    });
   }
 
   @Get('products/:id/image')
