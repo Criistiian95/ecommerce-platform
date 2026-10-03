@@ -164,6 +164,40 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+
+  private async ensureOrderPaymentColumns() {
+    const addColumnIfMissing = async (column: string, definition: string) => {
+      const [columns] = await this.sequelize.query(`SHOW COLUMNS FROM orders LIKE '${column}'`);
+      if ((columns as unknown[]).length === 0) {
+        await this.sequelize.query(`ALTER TABLE orders ADD COLUMN ${definition}`);
+      }
+    };
+
+    await this.sequelize.query(
+      "ALTER TABLE orders MODIFY status ENUM('pending','pending_payment','confirmed','preparing','shipped','delivered','cancelled') NOT NULL DEFAULT 'pending_payment'"
+    );
+    await addColumnIfMissing(
+      'payment_status',
+      "payment_status ENUM('pending','paid','rejected','cancelled','refunded') NOT NULL DEFAULT 'pending' AFTER status"
+    );
+    await addColumnIfMissing(
+      'mp_order_id',
+      "mp_order_id VARCHAR(100) NULL AFTER payment_status"
+    );
+    await addColumnIfMissing(
+      'mp_checkout_url',
+      "mp_checkout_url VARCHAR(1000) NULL AFTER mp_order_id"
+    );
+    await addColumnIfMissing(
+      'paid_at',
+      "paid_at DATETIME NULL AFTER mp_checkout_url"
+    );
+
+    await this.sequelize.query(
+      "ALTER TABLE stock_movements MODIFY type ENUM('initial','adjustment','sale','return','reservation','release') NOT NULL DEFAULT 'adjustment'"
+    );
+  }
+
   async onModuleInit() {
     await this.authenticateWithRetry();
 
@@ -172,6 +206,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     }
 
     await this.ensureProductColumns();
+    await this.ensureOrderPaymentColumns();
     await this.bootstrapDemoCommerce();
   }
 
