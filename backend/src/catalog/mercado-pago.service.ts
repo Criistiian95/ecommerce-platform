@@ -331,18 +331,26 @@ export class MercadoPagoService {
     }
   }
 
-  async getPublicOrderStatus(orderId: string) {
-    const order = await Order.findByPk(orderId, {
-      attributes: [
-        'id',
-        'orderNumber',
-        'status',
-        'paymentStatus',
-        'total',
-        'deliveryMethod',
-      ],
+  async getPublicOrderStatus(slug: string, orderId: string) {
+    const commerce = await Commerce.findOne({
+      where: { slug, active: true },
+      attributes: ['id'],
+    });
+    if (!commerce) return null;
+
+    let order = await Order.findOne({
+      where: { id: orderId, commerceId: commerce.id },
     });
     if (!order) return null;
+
+    if (order.paymentStatus === 'pending' && order.mpOrderId) {
+      try {
+        await this.processOrderNotification(order.mpOrderId);
+        order = (await Order.findByPk(order.id)) ?? order;
+      } catch (error) {
+        console.error('Could not refresh Mercado Pago order status', error);
+      }
+    }
 
     return {
       id: order.id,
@@ -351,6 +359,8 @@ export class MercadoPagoService {
       paymentStatus: order.paymentStatus,
       total: Number(order.total),
       deliveryMethod: order.deliveryMethod,
+      checkoutUrl:
+        order.paymentStatus === 'pending' ? order.mpCheckoutUrl : null,
     };
   }
 }
