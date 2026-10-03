@@ -112,7 +112,6 @@ export class Order extends Model {
         indexes: [
           { fields: ['commerce_id', 'created_at'], name: 'ix_orders_commerce_created' },
           { fields: ['commerce_id', 'status'], name: 'ix_orders_commerce_status' },
-          { fields: ['mp_order_id'], name: 'ix_orders_mp_order' },
         ],
       },
     );
