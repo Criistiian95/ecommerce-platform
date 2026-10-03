@@ -54,3 +54,25 @@
 :global(.cart-summary small){display:block;margin-top:10px;color:#667085}
 :global(.cart-alert){margin-bottom:16px;padding:12px 14px;background:#fff4e5;border-radius:12px}
 @media(max-width:900px){:global(.product-detail){grid-template-columns:1fr}:global(.cart-layout){grid-template-columns:1fr}:global(.cart-item){grid-template-columns:74px 1fr auto}:global(.cart-item img),:global(.cart-item-placeholder){width:74px;height:74px}:global(.cart-line-total){grid-column:2}:global(.cart-remove){grid-column:3}}
+
+:global(.checkout-layout){display:grid;grid-template-columns:1.3fr .7fr;gap:24px;align-items:start}
+:global(.checkout-card){background:#fff;border-radius:20px;padding:26px}
+:global(.checkout-card h1){margin-top:0}
+:global(.checkout-muted){color:#667085}
+:global(.checkout-grid){display:grid;grid-template-columns:1fr 1fr;gap:16px}
+:global(.checkout-card .field input),:global(.checkout-card .field textarea){width:100%}
+:global(.delivery-options){display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0 18px}
+:global(.delivery-option){display:flex;gap:10px;align-items:flex-start;border:1px solid #d7dce2;border-radius:14px;padding:14px;cursor:pointer}
+:global(.delivery-option.selected){border-color:#111827;background:#f8fafc}
+:global(.delivery-option span){display:flex;flex-direction:column;gap:4px}
+:global(.delivery-option small){color:#667085}
+:global(.checkout-submit){width:100%;margin-top:10px}
+:global(.checkout-items){display:flex;flex-direction:column;gap:12px;margin-top:14px}
+:global(.checkout-item){display:flex;justify-content:space-between;gap:14px;font-size:14px}
+:global(.checkout-total){border-top:1px solid #e5e7eb;padding-top:16px}
+:global(.checkout-success){max-width:620px;margin:50px auto;background:#fff;border-radius:24px;padding:34px;text-align:center}
+:global(.checkout-success-icon){width:54px;height:54px;margin:0 auto 16px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#e7f7ee;font-size:28px;font-weight:900}
+:global(.order-number){display:inline-block;margin:18px 0;padding:12px 16px;border-radius:12px;background:#f2f4f7;font-weight:800;letter-spacing:.03em}
+:global(.checkout-success-total){font-size:20px;margin-bottom:8px}
+@media(max-width:900px){:global(.checkout-layout){grid-template-columns:1fr}:global(.checkout-grid){grid-template-columns:1fr}}
+@media(max-width:640px){:global(.delivery-options){grid-template-columns:1fr}}
