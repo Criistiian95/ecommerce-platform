@@ -1,6 +1,7 @@
 import { DataTypes, Model, Sequelize } from 'sequelize';
 
-export type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'shipped' | 'delivered' | 'cancelled';
+export type OrderStatus = 'pending' | 'pending_payment' | 'confirmed' | 'preparing' | 'shipped' | 'delivered' | 'cancelled';
+export type PaymentStatus = 'pending' | 'paid' | 'rejected' | 'cancelled' | 'refunded';
 export type DeliveryMethod = 'pickup' | 'shipping';
 
 export class Order extends Model {
@@ -8,6 +9,10 @@ export class Order extends Model {
   declare commerceId: string;
   declare orderNumber: string;
   declare status: OrderStatus;
+  declare paymentStatus: PaymentStatus;
+  declare mpOrderId: string | null;
+  declare mpCheckoutUrl: string | null;
+  declare paidAt: Date | null;
   declare customerName: string;
   declare customerEmail: string;
   declare customerPhone: string;
@@ -37,9 +42,30 @@ export class Order extends Model {
           field: 'order_number',
         },
         status: {
-          type: DataTypes.ENUM('pending', 'confirmed', 'preparing', 'shipped', 'delivered', 'cancelled'),
+          type: DataTypes.ENUM('pending', 'pending_payment', 'confirmed', 'preparing', 'shipped', 'delivered', 'cancelled'),
+          allowNull: false,
+          defaultValue: 'pending_payment',
+        },
+        paymentStatus: {
+          type: DataTypes.ENUM('pending', 'paid', 'rejected', 'cancelled', 'refunded'),
           allowNull: false,
           defaultValue: 'pending',
+          field: 'payment_status',
+        },
+        mpOrderId: {
+          type: DataTypes.STRING(100),
+          allowNull: true,
+          field: 'mp_order_id',
+        },
+        mpCheckoutUrl: {
+          type: DataTypes.STRING(1000),
+          allowNull: true,
+          field: 'mp_checkout_url',
+        },
+        paidAt: {
+          type: DataTypes.DATE,
+          allowNull: true,
+          field: 'paid_at',
         },
         customerName: {
           type: DataTypes.STRING(160),
@@ -86,6 +112,7 @@ export class Order extends Model {
         indexes: [
           { fields: ['commerce_id', 'created_at'], name: 'ix_orders_commerce_created' },
           { fields: ['commerce_id', 'status'], name: 'ix_orders_commerce_status' },
+          { fields: ['mp_order_id'], name: 'ix_orders_mp_order' },
         ],
       },
     );
