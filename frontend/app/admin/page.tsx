@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 type Category = { id: string; name: string };
 type Product = {
@@ -22,13 +22,31 @@ export default function AdminPage() {
   const [token, setToken] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [message, setMessage] = useState('');
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [editing, setEditing] = useState<Product | null>(null);
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [savingProduct, setSavingProduct] = useState(false);
+  const productsSectionRef = useRef<HTMLElement | null>(null);
 
   const authHeaders = useMemo(
     () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }),
     [token],
   );
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 3500);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  async function apiMessage(response: Response, fallback: string) {
+    try {
+      const data = await response.clone().json();
+      if (typeof data?.message === 'string') return data.message;
+      if (Array.isArray(data?.message)) return data.message.join(', ');
+    } catch {}
+    return fallback;
+  }
 
   const lowStock = products.filter(
     product => product.active && product.currentStock <= product.minimumStock,
@@ -43,7 +61,7 @@ export default function AdminPage() {
     ]);
 
     if (!catRes.ok || !prodRes.ok) {
-      setMessage('No se pudo cargar el panel. Revisá el acceso del usuario.');
+      setToast({ type: 'error', text: 'No se pudo cargar el panel. Revisá el acceso del usuario.' });
       return;
     }
 
@@ -59,40 +77,74 @@ export default function AdminPage() {
 
   async function createCategory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const response = await fetch(`${API}/admin/catalog/categories`, {
-      method: 'POST',
-      headers: authHeaders,
-      body: JSON.stringify({ name: form.get('name') }),
-    });
-    setMessage(response.ok ? 'Categoría creada.' : 'No se pudo crear la categoría.');
-    if (response.ok) {
-      event.currentTarget.reset();
+    const target = event.currentTarget;
+    const form = new FormData(target);
+    setSavingCategory(true);
+
+    try {
+      const response = await fetch(`${API}/admin/catalog/categories`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ name: form.get('name') }),
+      });
+
+      if (!response.ok) {
+        setToast({
+          type: 'error',
+          text: await apiMessage(response, 'No se pudo crear la categoría.'),
+        });
+        return;
+      }
+
+      target.reset();
       await refresh();
+      setToast({ type: 'success', text: 'Categoría creada correctamente.' });
+    } catch {
+      setToast({ type: 'error', text: 'No se pudo conectar con el servidor.' });
+    } finally {
+      setSavingCategory(false);
     }
   }
 
   async function createProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const response = await fetch(`${API}/admin/catalog/products`, {
-      method: 'POST',
-      headers: authHeaders,
-      body: JSON.stringify({
-        sku: form.get('sku'),
-        name: form.get('name'),
-        price: Number(form.get('price')),
-        categoryId: form.get('categoryId') || null,
-        currentStock: Number(form.get('currentStock') || 0),
-        minimumStock: Number(form.get('minimumStock') || 0),
-        imageUrl: form.get('imageUrl') || null,
-      }),
-    });
+    const target = event.currentTarget;
+    const form = new FormData(target);
+    setSavingProduct(true);
 
-    setMessage(response.ok ? 'Producto creado.' : 'No se pudo crear el producto.');
-    if (response.ok) {
-      event.currentTarget.reset();
+    try {
+      const response = await fetch(`${API}/admin/catalog/products`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          sku: form.get('sku'),
+          name: form.get('name'),
+          price: Number(form.get('price')),
+          categoryId: form.get('categoryId') || null,
+          currentStock: Number(form.get('currentStock') || 0),
+          minimumStock: Number(form.get('minimumStock') || 0),
+          imageUrl: form.get('imageUrl') || null,
+        }),
+      });
+
+      if (!response.ok) {
+        setToast({
+          type: 'error',
+          text: await apiMessage(response, 'No se pudo crear el producto.'),
+        });
+        return;
+      }
+
+      target.reset();
       await refresh();
+      setToast({ type: 'success', text: 'Producto creado correctamente.' });
+      window.setTimeout(() => {
+        productsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    } catch {
+      setToast({ type: 'error', text: 'No se pudo conectar con el servidor.' });
+    } finally {
+      setSavingProduct(false);
     }
   }
 
@@ -114,7 +166,11 @@ export default function AdminPage() {
       }),
     });
 
-    setMessage(response.ok ? 'Producto actualizado.' : 'No se pudo actualizar el producto.');
+    if (!response.ok) {
+      setToast({ type: 'error', text: await apiMessage(response, 'No se pudo actualizar el producto.') });
+      return;
+    }
+    setToast({ type: 'success', text: 'Producto actualizado correctamente.' });
     if (response.ok) {
       setEditing(null);
       await refresh();
@@ -127,7 +183,11 @@ export default function AdminPage() {
       headers: authHeaders,
       body: JSON.stringify({ active }),
     });
-    setMessage(response.ok ? (active ? 'Producto activado.' : 'Producto desactivado.') : 'No se pudo cambiar el estado.');
+    if (!response.ok) {
+      setToast({ type: 'error', text: await apiMessage(response, 'No se pudo cambiar el estado.') });
+      return;
+    }
+    setToast({ type: 'success', text: active ? 'Producto activado.' : 'Producto desactivado.' });
     if (response.ok) await refresh();
   }
 
@@ -138,7 +198,11 @@ export default function AdminPage() {
       headers: authHeaders,
       body: JSON.stringify({ quantityChange: delta, reason: 'Ajuste desde panel admin' }),
     });
-    setMessage(response.ok ? 'Stock actualizado.' : 'No se pudo actualizar el stock.');
+    if (!response.ok) {
+      setToast({ type: 'error', text: await apiMessage(response, 'No se pudo actualizar el stock.') });
+      return;
+    }
+    setToast({ type: 'success', text: 'Stock actualizado.' });
     if (response.ok) await refresh();
   }
 
@@ -164,7 +228,13 @@ export default function AdminPage() {
         <a className="btn secondary" href="/">Ver tienda</a>
       </header>
 
-      {message && <p className="notice">{message}</p>}
+      {toast && (
+        <div className={`toast toast-${toast.type}`} role="status" aria-live="polite">
+          <span className="toast-icon">{toast.type === 'success' ? '✓' : '!'}</span>
+          <span>{toast.text}</span>
+          <button type="button" onClick={() => setToast(null)} aria-label="Cerrar">×</button>
+        </div>
+      )}
 
       <section className="summary-grid">
         <article className="card"><strong>{products.length}</strong><span>Productos</span></article>
@@ -185,7 +255,7 @@ export default function AdminPage() {
           <h2>Nueva categoría</h2>
           <form onSubmit={createCategory}>
             <label className="field">Nombre<input name="name" required /></label>
-            <button className="btn primary" type="submit">Crear categoría</button>
+            <button className="btn primary" type="submit" disabled={savingCategory}>{savingCategory ? 'Creando...' : 'Crear categoría'}</button>
           </form>
           <hr />
           <h3>Categorías</h3>
@@ -209,7 +279,7 @@ export default function AdminPage() {
               <label className="field">Stock mínimo<input name="minimumStock" type="number" min="0" defaultValue="0" /></label>
               <label className="field full-field">URL de imagen<input name="imageUrl" type="url" placeholder="https://..." /></label>
             </div>
-            <button className="btn primary" type="submit">Crear producto</button>
+            <button className="btn primary" type="submit" disabled={savingProduct}>{savingProduct ? 'Creando...' : 'Crear producto'}</button>
           </form>
         </article>
       </section>
@@ -242,7 +312,7 @@ export default function AdminPage() {
         </section>
       )}
 
-      <section className="card" style={{marginTop:24}}>
+      <section ref={productsSectionRef} className="card products-section" style={{marginTop:24}}>
         <h2>Productos</h2>
         <div style={{overflowX:'auto'}}>
           <table className="admin-table">
