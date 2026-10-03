@@ -7,12 +7,17 @@ export class Product extends Model {
   declare sku: string;
   declare name: string;
   declare description: string | null;
+  declare brand: string | null;
   declare price: string;
+  declare cost: string | null;
+  declare offerPrice: string | null;
   declare currentStock: number;
   declare minimumStock: number;
   declare imageUrl: string | null;
   declare imageData: Buffer | null;
   declare imageMimeType: string | null;
+  declare published: boolean;
+  declare featured: boolean;
   declare active: boolean;
 
   static register(sequelize: Sequelize) {
@@ -45,10 +50,23 @@ export class Product extends Model {
           type: DataTypes.TEXT,
           allowNull: true,
         },
+        brand: {
+          type: DataTypes.STRING(120),
+          allowNull: true,
+        },
         price: {
           type: DataTypes.DECIMAL(14, 2),
           allowNull: false,
           defaultValue: 0,
+        },
+        cost: {
+          type: DataTypes.DECIMAL(14, 2),
+          allowNull: true,
+        },
+        offerPrice: {
+          type: DataTypes.DECIMAL(14, 2),
+          allowNull: true,
+          field: 'offer_price',
         },
         currentStock: {
           type: DataTypes.INTEGER,
@@ -76,6 +94,16 @@ export class Product extends Model {
           type: DataTypes.STRING(60),
           allowNull: true,
           field: 'image_mime_type',
+        },
+        published: {
+          type: DataTypes.BOOLEAN,
+          allowNull: false,
+          defaultValue: true,
+        },
+        featured: {
+          type: DataTypes.BOOLEAN,
+          allowNull: false,
+          defaultValue: false,
         },
         active: {
           type: DataTypes.BOOLEAN,
