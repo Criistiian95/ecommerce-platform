@@ -5,7 +5,7 @@ import { Order } from '../database/models/order.model';
 import { OrderItem } from '../database/models/order-item.model';
 import { Product } from '../database/models/product.model';
 import { StockMovement } from '../database/models/stock-movement.model';
-import { OrderEmailService } from './order-email.service';
+import { MercadoPagoService } from './mercado-pago.service';
 
 type CheckoutInput = {
   customerName: string;
@@ -19,7 +19,7 @@ type CheckoutInput = {
 
 @Injectable()
 export class PublicCheckoutService {
-  constructor(private readonly orderEmail: OrderEmailService) {}
+  constructor(private readonly mercadoPago: MercadoPagoService) {}
   private validateCustomer(input: CheckoutInput) {
     const name = input.customerName?.trim();
     const email = input.customerEmail?.trim().toLowerCase();
@@ -110,7 +110,8 @@ export class PublicCheckoutService {
       const order = await Order.create({
         commerceId: commerce.id,
         orderNumber,
-        status: 'pending',
+        status: 'pending_payment',
+        paymentStatus: 'pending',
         customerName: input.customerName.trim(),
         customerEmail: input.customerEmail.trim().toLowerCase(),
         customerPhone: input.customerPhone.trim(),
@@ -143,45 +144,46 @@ export class PublicCheckoutService {
           commerceId: commerce.id,
           productId: line.product.id,
           userId: null,
-          type: 'sale',
+          type: 'reservation',
           previousStock,
           quantityChange: -line.quantity,
           newStock,
-          reason: `Pedido ${orderNumber}`,
+          reason: `Reserva pedido ${orderNumber}`,
         }, { transaction });
       }
 
       await transaction.commit();
 
-      void this.orderEmail.sendConfirmation({
-        commerceName: commerce.name,
-        orderNumber: order.orderNumber,
-        customerName: order.customerName,
-        customerEmail: order.customerEmail,
-        deliveryMethod: order.deliveryMethod,
-        address: order.address,
-        total: Number(order.total),
-        items: orderLines.map(line => ({
-          name: line.product.name,
-          quantity: line.quantity,
-          unitPrice: line.unitPrice,
-          lineTotal: line.lineTotal,
-        })),
-      }).catch(error => {
-        console.error('Unexpected order confirmation email error', error);
-      });
+      try {
+        const payment = await this.mercadoPago.createCheckout(
+          order,
+          orderLines.map(line => ({
+            title: line.product.name,
+            quantity: line.quantity,
+            unitPrice: line.unitPrice,
+          })),
+        );
 
-      return {
-        ok: true,
-        order: {
-          id: order.id,
-          orderNumber: order.orderNumber,
-          status: order.status,
-          subtotal: Number(order.subtotal),
-          total: Number(order.total),
-          deliveryMethod: order.deliveryMethod,
-        },
-      };
+        return {
+          ok: true,
+          order: {
+            id: order.id,
+            orderNumber: order.orderNumber,
+            status: order.status,
+            paymentStatus: order.paymentStatus,
+            subtotal: Number(order.subtotal),
+            total: Number(order.total),
+            deliveryMethod: order.deliveryMethod,
+          },
+          payment,
+        };
+      } catch (error) {
+        console.error('Mercado Pago checkout creation failed', error);
+        await this.mercadoPago.releaseReservation(order, 'cancelled');
+        throw new BadRequestException(
+          'No se pudo iniciar el pago. El stock reservado fue liberado.',
+        );
+      }
     } catch (error) {
       await transaction.rollback();
       throw error;
