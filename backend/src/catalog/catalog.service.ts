@@ -31,6 +31,13 @@ export class CatalogService {
     });
   }
 
+  private sanitizeProduct(product: Product) {
+    const plain = product.get({ plain: true }) as Record<string, unknown>;
+    const hasUploadedImage = Boolean(plain.imageData);
+    delete plain.imageData;
+    return { ...plain, hasUploadedImage };
+  }
+
   private decodeImage(input?: { imageDataBase64?: string | null; imageMimeType?: string | null }) {
     const base64 = input?.imageDataBase64?.trim();
     const mime = input?.imageMimeType?.trim().toLowerCase();
@@ -138,7 +145,7 @@ export class CatalogService {
       });
     }
 
-    return product;
+    return this.sanitizeProduct(product);
   }
 
   async updateProduct(
@@ -197,7 +204,7 @@ export class CatalogService {
         : {}),
     });
 
-    return product;
+    return this.sanitizeProduct(product);
   }
 
   async getProductImage(productId: string) {
