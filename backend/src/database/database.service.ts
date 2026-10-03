@@ -18,6 +18,15 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     this.sequelize = new Sequelize(url, {
       dialect: 'mysql',
       logging: false,
+      pool: {
+        max: 5,
+        min: 0,
+        acquire: 30000,
+        idle: 10000,
+      },
+      dialectOptions: {
+        connectTimeout: 20000,
+      },
       define: { timestamps: true },
     });
 
@@ -48,34 +57,32 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     User.hasMany(StockMovement, { foreignKey: 'userId', as: 'stockMovements' });
   }
 
-  private async ensureDatabase() {
-    const adminUrl = process.env.MYSQL_ADMIN_URL;
-    const databaseName = process.env.DATABASE_NAME ?? 'ecommerce';
-    const appUser = process.env.DATABASE_USER ?? 'ecommerce_app';
-    const appPassword = process.env.DATABASE_PASSWORD;
+  private async wait(ms: number) {
+    await new Promise(resolve => setTimeout(resolve, ms));
+  }
 
-    if (!adminUrl || !appPassword) return;
+  private async authenticateWithRetry(attempts = 6) {
+    let lastError: unknown;
 
-    const admin = new Sequelize(adminUrl, {
-      dialect: 'mysql',
-      logging: false,
-    });
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        await this.sequelize.authenticate();
+        return;
+      } catch (error) {
+        lastError = error;
+        console.error(`MySQL connection attempt ${attempt}/${attempts} failed`);
 
-    try {
-      await admin.authenticate();
-      await admin.query(`CREATE DATABASE IF NOT EXISTS \`${databaseName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
-      await admin.query(`CREATE USER IF NOT EXISTS '${appUser}'@'%' IDENTIFIED BY '${appPassword}'`);
-      await admin.query(`ALTER USER '${appUser}'@'%' IDENTIFIED BY '${appPassword}'`);
-      await admin.query(`GRANT ALL PRIVILEGES ON \`${databaseName}\`.* TO '${appUser}'@'%'`);
-      await admin.query('FLUSH PRIVILEGES');
-    } finally {
-      await admin.close();
+        if (attempt < attempts) {
+          await this.wait(3000);
+        }
+      }
     }
+
+    throw lastError;
   }
 
   async onModuleInit() {
-    await this.ensureDatabase();
-    await this.sequelize.authenticate();
+    await this.authenticateWithRetry();
 
     if (process.env.DB_SYNC === 'true') {
       await this.sequelize.sync();
