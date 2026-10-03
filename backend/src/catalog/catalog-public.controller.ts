@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, Post, Res } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, NotFoundException, Param, Post, Query, Res, UnauthorizedException } from '@nestjs/common';
 import type { Response } from 'express';
 import { CatalogService } from './catalog.service';
 import { PublicCatalogService } from './public-catalog.service';
 import { PublicCartService } from './public-cart.service';
 import { PublicCheckoutService } from './public-checkout.service';
+import { MercadoPagoService } from './mercado-pago.service';
 
 @Controller('catalog')
 export class CatalogPublicController {
@@ -12,6 +13,7 @@ export class CatalogPublicController {
     private readonly publicCatalog: PublicCatalogService,
     private readonly publicCart: PublicCartService,
     private readonly publicCheckout: PublicCheckoutService,
+    private readonly mercadoPago: MercadoPagoService,
   ) {}
 
   @Get('store/:slug')
@@ -50,6 +52,40 @@ export class CatalogPublicController {
       ...body,
       items: body.items ?? [],
     });
+  }
+
+
+  @Get('store/:slug/orders/:id/status')
+  async orderStatus(@Param('slug') slug: string, @Param('id') id: string) {
+    const status = await this.mercadoPago.getPublicOrderStatus(slug, id);
+    if (!status) throw new NotFoundException('Pedido no encontrado');
+    return status;
+  }
+
+  @Post('mercadopago/webhook')
+  @HttpCode(200)
+  async mercadoPagoWebhook(
+    @Headers('x-signature') xSignature: string | undefined,
+    @Headers('x-request-id') xRequestId: string | undefined,
+    @Query('data.id') queryDataId: string | undefined,
+    @Body() body: { data?: { id?: string }; type?: string },
+  ) {
+    const dataId = queryDataId ?? body?.data?.id;
+    const valid = this.mercadoPago.validateWebhookSignature(
+      xSignature,
+      xRequestId,
+      dataId,
+    );
+
+    if (!valid) {
+      throw new UnauthorizedException('Firma de webhook inválida');
+    }
+
+    if (dataId && (!body?.type || body.type === 'order')) {
+      await this.mercadoPago.processOrderNotification(dataId);
+    }
+
+    return { ok: true };
   }
 
   @Get('products/:id/image')
