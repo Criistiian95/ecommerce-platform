@@ -1,10 +1,13 @@
 'use client';
 import {useEffect,useState} from 'react';
+import Link from 'next/link';
+import {useCart} from './cart-context';
 import StoreProductCard from './store-product-card';
 import {API_URL,StoreCatalog} from './storefront-types';
 import {COMMERCE_SLUG} from './storefront-config';
 
 export default function StorefrontClient(){
+  const {totalItems}=useCart();
   const [catalog,setCatalog]=useState<StoreCatalog|null>(null);
   const [error,setError]=useState('');
   useEffect(()=>{
@@ -17,7 +20,10 @@ export default function StorefrontClient(){
   return <>
     <header className="store-header">
       <div><div className="store-brand">{catalog.commerce.name}</div><small>Tienda online</small></div>
-      <a className="btn secondary" href="/login">Administrar</a>
+      <div className="store-header-actions">
+        <Link className="btn secondary" href="/carrito">Carrito ({totalItems})</Link>
+        <a className="btn secondary" href="/login">Administrar</a>
+      </div>
     </header>
     <section className="store-hero">
       <span className="eyebrow">CATÁLOGO ONLINE</span>
