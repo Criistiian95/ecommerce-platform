@@ -1,0 +1,27 @@
+.root{}
+:global(.store-shell){max-width:1220px;margin:auto;padding:24px}
+:global(.store-header){display:flex;justify-content:space-between;align-items:center;background:#fff;padding:18px 24px;border-radius:18px;box-shadow:0 8px 24px rgba(0,0,0,.05)}
+:global(.store-brand){font-size:26px;font-weight:800}
+:global(.store-hero){margin-top:24px;background:#fff;border-radius:24px;padding:48px}
+:global(.store-hero h1){font-size:48px;line-height:1.05;margin:8px 0 12px}
+:global(.store-hero p){font-size:18px;color:#667085}
+:global(.eyebrow){font-size:12px;font-weight:800;letter-spacing:.12em;color:#667085}
+:global(.store-section){margin-top:28px}
+:global(.store-section-head){display:flex;justify-content:space-between;align-items:end;gap:16px;margin-bottom:16px}
+:global(.product-grid){display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+:global(.store-product-card){background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 8px 22px rgba(0,0,0,.04)}
+:global(.store-product-image-wrap){position:relative;background:#f0f2f5;aspect-ratio:4/3}
+:global(.store-product-image){width:100%;height:100%;object-fit:cover}
+:global(.store-product-image.placeholder){display:flex;align-items:center;justify-content:center;color:#98a2b3}
+:global(.store-badge){position:absolute;top:12px;left:12px;z-index:2;background:#111827;color:#fff;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:700}
+:global(.store-product-content){padding:18px}
+:global(.store-product-content h3){margin:4px 0 8px;font-size:20px}
+:global(.store-product-content p){color:#667085;line-height:1.45}
+:global(.store-category){display:inline-block;font-size:12px;color:#667085;margin-bottom:8px}
+:global(.store-product-bottom){display:flex;justify-content:space-between;align-items:end;gap:14px;margin-top:18px}
+:global(.store-price){display:flex;flex-direction:column}
+:global(.store-price small){text-decoration:line-through;color:#98a2b3}
+:global(.store-price strong){font-size:22px}
+:global(.store-empty){background:#fff;padding:28px;border-radius:18px;text-align:center;color:#667085}
+@media(max-width:900px){:global(.product-grid){grid-template-columns:repeat(2,minmax(0,1fr))}:global(.store-hero h1){font-size:40px}}
+@media(max-width:640px){:global(.store-shell){padding:14px}:global(.store-hero){padding:28px}:global(.store-hero h1){font-size:34px}:global(.product-grid){grid-template-columns:1fr}:global(.store-product-bottom){align-items:stretch;flex-direction:column}}
