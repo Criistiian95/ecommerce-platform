@@ -1,6 +1,6 @@
 import { DataTypes, Model, Sequelize } from 'sequelize';
 
-export type StockMovementType = 'initial' | 'adjustment' | 'sale' | 'return';
+export type StockMovementType = 'initial' | 'adjustment' | 'sale' | 'return' | 'reservation' | 'release';
 
 export class StockMovement extends Model {
   declare id: string;
@@ -37,7 +37,7 @@ export class StockMovement extends Model {
           field: 'user_id',
         },
         type: {
-          type: DataTypes.ENUM('initial', 'adjustment', 'sale', 'return'),
+          type: DataTypes.ENUM('initial', 'adjustment', 'sale', 'return', 'reservation', 'release'),
           allowNull: false,
           defaultValue: 'adjustment',
         },
