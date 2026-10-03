@@ -5,6 +5,7 @@ import { Order } from '../database/models/order.model';
 import { OrderItem } from '../database/models/order-item.model';
 import { Product } from '../database/models/product.model';
 import { StockMovement } from '../database/models/stock-movement.model';
+import { OrderEmailService } from './order-email.service';
 
 type CheckoutInput = {
   customerName: string;
@@ -18,6 +19,7 @@ type CheckoutInput = {
 
 @Injectable()
 export class PublicCheckoutService {
+  constructor(private readonly orderEmail: OrderEmailService) {}
   private validateCustomer(input: CheckoutInput) {
     const name = input.customerName?.trim();
     const email = input.customerEmail?.trim().toLowerCase();
@@ -45,7 +47,7 @@ export class PublicCheckoutService {
 
     const commerce = await Commerce.findOne({
       where: { slug, active: true },
-      attributes: ['id'],
+      attributes: ['id', 'name'],
     });
 
     if (!commerce) {
@@ -150,6 +152,24 @@ export class PublicCheckoutService {
       }
 
       await transaction.commit();
+
+      void this.orderEmail.sendConfirmation({
+        commerceName: commerce.name,
+        orderNumber: order.orderNumber,
+        customerName: order.customerName,
+        customerEmail: order.customerEmail,
+        deliveryMethod: order.deliveryMethod,
+        address: order.address,
+        total: Number(order.total),
+        items: orderLines.map(line => ({
+          name: line.product.name,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          lineTotal: line.lineTotal,
+        })),
+      }).catch(error => {
+        console.error('Unexpected order confirmation email error', error);
+      });
 
       return {
         ok: true,
