@@ -157,6 +157,11 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     await addColumnIfMissing('offer_price', 'offer_price DECIMAL(14,2) NULL AFTER cost');
     await addColumnIfMissing('published', 'published TINYINT(1) NOT NULL DEFAULT 1 AFTER image_mime_type');
     await addColumnIfMissing('featured', 'featured TINYINT(1) NOT NULL DEFAULT 0 AFTER published');
+
+    const [userIdColumn] = await this.sequelize.query("SHOW COLUMNS FROM stock_movements LIKE 'user_id'");
+    if ((userIdColumn as any[])[0]?.Null === 'NO') {
+      await this.sequelize.query('ALTER TABLE stock_movements MODIFY user_id CHAR(36) NULL');
+    }
   }
 
   async onModuleInit() {
