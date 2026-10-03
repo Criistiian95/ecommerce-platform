@@ -81,8 +81,8 @@ export class CatalogPublicController {
       throw new UnauthorizedException('Firma de webhook inválida');
     }
 
-    if (dataId && (!body?.type || body.type === 'order')) {
-      await this.mercadoPago.processOrderNotification(dataId);
+    if (dataId && (!body?.type || body.type === 'payment')) {
+      await this.mercadoPago.processPaymentNotification(dataId);
     }
 
     return { ok: true };
