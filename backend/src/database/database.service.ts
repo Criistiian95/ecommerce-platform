@@ -48,9 +48,36 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     User.hasMany(StockMovement, { foreignKey: 'userId', as: 'stockMovements' });
   }
 
+  private async ensureDatabase() {
+    const adminUrl = process.env.MYSQL_ADMIN_URL;
+    const databaseName = process.env.DATABASE_NAME ?? 'ecommerce';
+    const appUser = process.env.DATABASE_USER ?? 'ecommerce_app';
+    const appPassword = process.env.DATABASE_PASSWORD;
+
+    if (!adminUrl || !appPassword) return;
+
+    const admin = new Sequelize(adminUrl, {
+      dialect: 'mysql',
+      logging: false,
+    });
+
+    try {
+      await admin.authenticate();
+      await admin.query(`CREATE DATABASE IF NOT EXISTS \`${databaseName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+      await admin.query(`CREATE USER IF NOT EXISTS '${appUser}'@'%' IDENTIFIED BY '${appPassword}'`);
+      await admin.query(`ALTER USER '${appUser}'@'%' IDENTIFIED BY '${appPassword}'`);
+      await admin.query(`GRANT ALL PRIVILEGES ON \`${databaseName}\`.* TO '${appUser}'@'%'`);
+      await admin.query('FLUSH PRIVILEGES');
+    } finally {
+      await admin.close();
+    }
+  }
+
   async onModuleInit() {
+    await this.ensureDatabase();
     await this.sequelize.authenticate();
-    if (process.env.NODE_ENV !== 'production') {
+
+    if (process.env.DB_SYNC === 'true') {
       await this.sequelize.sync();
     }
   }
