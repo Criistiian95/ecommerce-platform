@@ -36,7 +36,12 @@ export class CatalogController {
       sku: string;
       name: string;
       description?: string;
+      brand?: string;
       price: number;
+      cost?: number | null;
+      offerPrice?: number | null;
+      published?: boolean;
+      featured?: boolean;
       categoryId?: string | null;
       currentStock?: number;
       minimumStock?: number;
@@ -57,7 +62,12 @@ export class CatalogController {
       sku?: string;
       name?: string;
       description?: string | null;
+      brand?: string | null;
       price?: number;
+      cost?: number | null;
+      offerPrice?: number | null;
+      published?: boolean;
+      featured?: boolean;
       categoryId?: string | null;
       minimumStock?: number;
       imageUrl?: string | null;
