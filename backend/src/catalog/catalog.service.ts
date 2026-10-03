@@ -143,9 +143,9 @@ export class CatalogService {
       description: input.description?.trim() || null,
       brand: input.brand?.trim() || null,
       price: Number(input.price),
-      cost: input.cost === undefined || input.cost === null || input.cost === '' as any ? null : Number(input.cost),
+      cost: input.cost === undefined || input.cost === null ? null : Number(input.cost),
       offerPrice:
-        input.offerPrice === undefined || input.offerPrice === null || input.offerPrice === '' as any
+        input.offerPrice === undefined || input.offerPrice === null
           ? null
           : Number(input.offerPrice),
       currentStock: initialStock,
