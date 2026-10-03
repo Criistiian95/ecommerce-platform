@@ -8,6 +8,11 @@ type Product = {
   sku: string;
   name: string;
   price: string;
+  cost?: string | null;
+  offerPrice?: string | null;
+  brand?: string | null;
+  published?: boolean;
+  featured?: boolean;
   currentStock: number;
   minimumStock: number;
   imageUrl?: string | null;
@@ -157,7 +162,12 @@ export default function AdminPage() {
           sku: form.get('sku'),
           name: form.get('name'),
           description: form.get('description') || null,
+          brand: form.get('brand') || null,
           price: Number(form.get('price')),
+          cost: form.get('cost') ? Number(form.get('cost')) : null,
+          offerPrice: form.get('offerPrice') ? Number(form.get('offerPrice')) : null,
+          published: form.get('published') === 'on',
+          featured: form.get('featured') === 'on',
           categoryId: form.get('categoryId') || null,
           currentStock: Number(form.get('currentStock') || 0),
           minimumStock: Number(form.get('minimumStock') || 0),
@@ -216,7 +226,12 @@ export default function AdminPage() {
         sku: form.get('sku'),
         name: form.get('name'),
         description: form.get('description') || null,
+        brand: form.get('brand') || null,
         price: Number(form.get('price')),
+        cost: form.get('cost') ? Number(form.get('cost')) : null,
+        offerPrice: form.get('offerPrice') ? Number(form.get('offerPrice')) : null,
+        published: form.get('published') === 'on',
+        featured: form.get('featured') === 'on',
         categoryId: form.get('categoryId') || null,
         minimumStock: Number(form.get('minimumStock') || 0),
         imageUrl: uploaded ? null : (form.get('imageUrl') || null),
@@ -329,6 +344,9 @@ export default function AdminPage() {
               <label className="field">SKU<input name="sku" required /></label>
               <label className="field">Nombre<input name="name" required /></label>
               <label className="field">Precio<input name="price" type="number" min="0" step="0.01" required /></label>
+              <label className="field">Precio de oferta (opcional)<input name="offerPrice" type="number" min="0" step="0.01" /></label>
+              <label className="field">Costo interno (opcional)<input name="cost" type="number" min="0" step="0.01" /></label>
+              <label className="field">Marca (opcional)<input name="brand" /></label>
               <label className="field">Categoría
                 <select name="categoryId">
                   <option value="">Sin categoría</option>
@@ -337,6 +355,10 @@ export default function AdminPage() {
               </label>
               <label className="field">Stock inicial<input name="currentStock" type="number" min="0" defaultValue="0" /></label>
               <label className="field">Stock mínimo<input name="minimumStock" type="number" min="0" defaultValue="0" /></label>
+              <div className="product-options full-field">
+                <label className="check-field"><input name="published" type="checkbox" defaultChecked /> Publicado</label>
+                <label className="check-field"><input name="featured" type="checkbox" /> Destacado</label>
+              </div>
               <label className="field full-field">Descripción breve
                 <textarea name="description" rows={3} maxLength={300} placeholder="Descripción corta del producto" />
               </label>
@@ -368,6 +390,9 @@ export default function AdminPage() {
               <label className="field">SKU<input name="sku" defaultValue={editing.sku} required /></label>
               <label className="field">Nombre<input name="name" defaultValue={editing.name} required /></label>
               <label className="field">Precio<input name="price" type="number" min="0" step="0.01" defaultValue={editing.price} required /></label>
+              <label className="field">Precio de oferta (opcional)<input name="offerPrice" type="number" min="0" step="0.01" defaultValue={editing.offerPrice ?? ''} /></label>
+              <label className="field">Costo interno (opcional)<input name="cost" type="number" min="0" step="0.01" defaultValue={editing.cost ?? ''} /></label>
+              <label className="field">Marca (opcional)<input name="brand" defaultValue={editing.brand ?? ''} /></label>
               <label className="field">Categoría
                 <select name="categoryId" defaultValue={editing.categoryId ?? editing.category?.id ?? ''}>
                   <option value="">Sin categoría</option>
@@ -375,6 +400,10 @@ export default function AdminPage() {
                 </select>
               </label>
               <label className="field">Stock mínimo<input name="minimumStock" type="number" min="0" defaultValue={editing.minimumStock} /></label>
+              <div className="product-options full-field">
+                <label className="check-field"><input name="published" type="checkbox" defaultChecked={editing.published ?? true} /> Publicado</label>
+                <label className="check-field"><input name="featured" type="checkbox" defaultChecked={editing.featured ?? false} /> Destacado</label>
+              </div>
               <label className="field full-field">Descripción breve
                 <textarea name="description" rows={3} maxLength={300} defaultValue={editing.description ?? ''} />
               </label>
@@ -399,7 +428,7 @@ export default function AdminPage() {
             <thead>
               <tr>
                 <th>Producto</th><th>Categoría</th><th>Precio</th><th>Stock</th>
-                <th>Estado</th><th>Ajustar stock</th><th>Acciones</th>
+                <th>Publicación</th><th>Estado</th><th>Ajustar stock</th><th>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -418,17 +447,32 @@ export default function AdminPage() {
                         )}
                         <div>
                           <strong>{product.name}</strong>
-                          <small>{product.sku}</small>
+                          <small>{product.sku}{product.brand ? ` · ${product.brand}` : ''}</small>
                           {product.description && <small className="product-description">{product.description}</small>}
                         </div>
                       </div>
                     </td>
                     <td>{product.category?.name ?? '-'}</td>
-                    <td>$ {Number(product.price).toLocaleString('es-AR')}</td>
+                    <td>
+                      {product.offerPrice ? (
+                        <div className="price-stack">
+                          <small className="old-price">$ {Number(product.price).toLocaleString('es-AR')}</small>
+                          <strong>$ {Number(product.offerPrice).toLocaleString('es-AR')}</strong>
+                        </div>
+                      ) : (
+                        <>$ {Number(product.price).toLocaleString('es-AR')}</>
+                      )}
+                    </td>
                     <td>
                       <strong>{product.currentStock}</strong>
                       <small className="stock-min">mín. {product.minimumStock}</small>
                       {isLow && <span className="stock-badge">Stock bajo</span>}
+                    </td>
+                    <td>
+                      <div className="publication-cell">
+                        <span className={product.published ? 'status-active' : 'status-draft'}>{product.published ? 'Publicado' : 'Borrador'}</span>
+                        {product.featured && <span className="featured-badge">Destacado</span>}
+                      </div>
                     </td>
                     <td><span className={product.active ? 'status-active' : 'status-inactive'}>{product.active ? 'Activo' : 'Inactivo'}</span></td>
                     <td><StockAdjuster onAdjust={(delta) => adjustStock(product.id, delta)} /></td>
