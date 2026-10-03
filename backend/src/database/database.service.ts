@@ -1,5 +1,5 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import bcrypt from 'bcryptjs';
+import * as bcrypt from 'bcryptjs';
 import { Sequelize } from 'sequelize';
 import { Commerce } from './models/commerce.model';
 import { User } from './models/user.model';
