@@ -129,16 +129,21 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     console.log(`Demo commerce bootstrapped: ${commerceSlug}`);
   }
 
-  private async ensureProductImageColumns() {
-    const [imageDataColumns] = await this.sequelize.query("SHOW COLUMNS FROM products LIKE 'image_data'");
-    if ((imageDataColumns as unknown[]).length === 0) {
-      await this.sequelize.query("ALTER TABLE products ADD COLUMN image_data MEDIUMBLOB NULL AFTER image_url");
-    }
+  private async ensureProductColumns() {
+    const addColumnIfMissing = async (column: string, definition: string) => {
+      const [columns] = await this.sequelize.query(`SHOW COLUMNS FROM products LIKE '${column}'`);
+      if ((columns as unknown[]).length === 0) {
+        await this.sequelize.query(`ALTER TABLE products ADD COLUMN ${definition}`);
+      }
+    };
 
-    const [mimeColumns] = await this.sequelize.query("SHOW COLUMNS FROM products LIKE 'image_mime_type'");
-    if ((mimeColumns as unknown[]).length === 0) {
-      await this.sequelize.query("ALTER TABLE products ADD COLUMN image_mime_type VARCHAR(60) NULL AFTER image_data");
-    }
+    await addColumnIfMissing('image_data', 'image_data MEDIUMBLOB NULL AFTER image_url');
+    await addColumnIfMissing('image_mime_type', 'image_mime_type VARCHAR(60) NULL AFTER image_data');
+    await addColumnIfMissing('brand', 'brand VARCHAR(120) NULL AFTER description');
+    await addColumnIfMissing('cost', 'cost DECIMAL(14,2) NULL AFTER price');
+    await addColumnIfMissing('offer_price', 'offer_price DECIMAL(14,2) NULL AFTER cost');
+    await addColumnIfMissing('published', 'published TINYINT(1) NOT NULL DEFAULT 1 AFTER image_mime_type');
+    await addColumnIfMissing('featured', 'featured TINYINT(1) NOT NULL DEFAULT 0 AFTER published');
   }
 
   async onModuleInit() {
@@ -148,7 +153,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       await this.sequelize.sync();
     }
 
-    await this.ensureProductImageColumns();
+    await this.ensureProductColumns();
     await this.bootstrapDemoCommerce();
   }
 
