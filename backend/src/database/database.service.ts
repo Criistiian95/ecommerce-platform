@@ -160,7 +160,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
     const [userIdColumn] = await this.sequelize.query("SHOW COLUMNS FROM stock_movements LIKE 'user_id'");
     if ((userIdColumn as any[])[0]?.Null === 'NO') {
-      await this.sequelize.query('ALTER TABLE stock_movements MODIFY user_id CHAR(36) NULL');
+      await this.sequelize.query('ALTER TABLE stock_movements MODIFY user_id CHAR(36) BINARY NULL');
     }
   }
 
