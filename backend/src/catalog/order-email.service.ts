@@ -63,8 +63,8 @@ export class OrderEmailService {
 
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#1f2937">
-        <h1 style="margin-bottom:8px">Pedido recibido</h1>
-        <p>Hola ${this.escape(input.customerName)}, recibimos tu pedido en ${this.escape(input.commerceName)}.</p>
+        <h1 style="margin-bottom:8px">Pago confirmado</h1>
+        <p>Hola ${this.escape(input.customerName)}, tu pago fue acreditado y tu pedido en ${this.escape(input.commerceName)} quedó confirmado.</p>
 
         <div style="background:#f5f6f8;border-radius:12px;padding:16px;margin:20px 0">
           <strong>Número de pedido</strong>
@@ -88,12 +88,12 @@ export class OrderEmailService {
         </div>
 
         <p style="margin-top:22px"><strong>Entrega:</strong> ${delivery}</p>
-        <p style="color:#6b7280">El pedido quedó registrado con estado pendiente. El comercio podrá actualizar su estado cuando comience a prepararlo.</p>
+        <p style="color:#6b7280">El pedido quedó confirmado. El comercio podrá actualizar su estado cuando comience a prepararlo.</p>
       </div>
     `;
 
     const text = [
-      `Pedido recibido - ${input.commerceName}`,
+      `Pago confirmado - ${input.commerceName}`,
       `Pedido: ${input.orderNumber}`,
       '',
       ...input.items.map(item =>
@@ -113,7 +113,7 @@ export class OrderEmailService {
       body: JSON.stringify({
         from,
         to: [input.customerEmail],
-        subject: `Pedido ${input.orderNumber} recibido`,
+        subject: `Pago confirmado - Pedido ${input.orderNumber}`,
         html,
         text,
         tags: [
