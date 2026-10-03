@@ -6,7 +6,7 @@ export class StockMovement extends Model {
   declare id: string;
   declare commerceId: string;
   declare productId: string;
-  declare userId: string;
+  declare userId: string | null;
   declare type: StockMovementType;
   declare previousStock: number;
   declare quantityChange: number;
@@ -33,7 +33,7 @@ export class StockMovement extends Model {
         },
         userId: {
           type: DataTypes.UUID,
-          allowNull: false,
+          allowNull: true,
           field: 'user_id',
         },
         type: {
