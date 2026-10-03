@@ -1,10 +1,11 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
 import { DatabaseService } from '../database/database.service';
 import { User } from '../database/models/user.model';
 import { Session } from '../database/models/session.model';
+import { Commerce } from '../database/models/commerce.model';
 
 @Injectable()
 export class AuthService {
@@ -49,6 +50,71 @@ export class AuthService {
         commerceId: user.commerceId,
       },
     };
+  }
+
+  async createInitialAdmin(input: {
+    commerceName: string;
+    commerceSlug: string;
+    adminName: string;
+    email: string;
+    password: string;
+  }) {
+    const existingUsers = await User.count();
+    if (existingUsers > 0) {
+      throw new ConflictException('El alta inicial ya fue utilizada');
+    }
+
+    const commerceName = input.commerceName?.trim();
+    const commerceSlug = input.commerceSlug?.trim().toLowerCase();
+    const adminName = input.adminName?.trim();
+    const email = input.email?.trim().toLowerCase();
+    const password = input.password ?? '';
+
+    if (!commerceName || !commerceSlug || !adminName || !email || !password) {
+      throw new BadRequestException('Faltan datos obligatorios');
+    }
+    if (password.length < 10) {
+      throw new BadRequestException('La contraseña debe tener al menos 10 caracteres');
+    }
+
+    const transaction = await this.db.sequelize.transaction();
+    try {
+      const commerce = await Commerce.create({
+        name: commerceName,
+        slug: commerceSlug,
+        active: true,
+      }, { transaction });
+
+      const passwordHash = await bcrypt.hash(password, 12);
+      const user = await User.create({
+        commerceId: commerce.id,
+        email,
+        passwordHash,
+        name: adminName,
+        role: 'admin',
+        active: true,
+      }, { transaction });
+
+      await transaction.commit();
+
+      return {
+        ok: true,
+        commerce: {
+          id: commerce.id,
+          name: commerce.name,
+          slug: commerce.slug,
+        },
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        },
+      };
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
   }
 
   async logout(sessionId: string) {
