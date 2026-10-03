@@ -30,3 +30,14 @@
 .inactive-row{opacity:.62}
 .row-actions{display:flex;gap:8px;flex-wrap:wrap}
 @media(max-width:800px){.summary-grid{grid-template-columns:1fr}.admin-two-columns{grid-template-columns:1fr}}
+
+.toast{position:fixed;top:22px;right:22px;z-index:1000;display:flex;align-items:center;gap:10px;min-width:300px;max-width:440px;padding:14px 16px;border-radius:14px;box-shadow:0 14px 35px rgba(0,0,0,.16);font-weight:700;background:#fff}
+.toast-success{border:1px solid #a7e3bd}
+.toast-error{border:1px solid #f0b0b0}
+.toast-icon{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;flex:0 0 26px}
+.toast-success .toast-icon{background:#e7f7ee}
+.toast-error .toast-icon{background:#fde8e8}
+.toast button{margin-left:auto;border:0;background:transparent;font-size:22px;line-height:1;cursor:pointer;color:#667085}
+.products-section{scroll-margin-top:22px}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+@media(max-width:600px){.toast{left:16px;right:16px;min-width:0;max-width:none}}
