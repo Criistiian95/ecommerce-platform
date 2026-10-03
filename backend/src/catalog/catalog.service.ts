@@ -92,7 +92,12 @@ export class CatalogService {
       sku: string;
       name: string;
       description?: string;
+      brand?: string;
       price: number;
+      cost?: number | null;
+      offerPrice?: number | null;
+      published?: boolean;
+      featured?: boolean;
       categoryId?: string | null;
       currentStock?: number;
       minimumStock?: number;
@@ -107,6 +112,19 @@ export class CatalogService {
     }
     if (!Number.isFinite(Number(input.price)) || Number(input.price) < 0) {
       throw new BadRequestException('Precio inválido');
+    }
+    if (input.cost !== undefined && input.cost !== null && (!Number.isFinite(Number(input.cost)) || Number(input.cost) < 0)) {
+      throw new BadRequestException('Costo inválido');
+    }
+    if (input.offerPrice !== undefined && input.offerPrice !== null && (!Number.isFinite(Number(input.offerPrice)) || Number(input.offerPrice) < 0)) {
+      throw new BadRequestException('Precio de oferta inválido');
+    }
+    if (
+      input.offerPrice !== undefined &&
+      input.offerPrice !== null &&
+      Number(input.offerPrice) >= Number(input.price)
+    ) {
+      throw new BadRequestException('El precio de oferta debe ser menor al precio normal');
     }
 
     if (input.categoryId) {
@@ -123,12 +141,20 @@ export class CatalogService {
       sku: input.sku.trim(),
       name: input.name.trim(),
       description: input.description?.trim() || null,
+      brand: input.brand?.trim() || null,
       price: Number(input.price),
+      cost: input.cost === undefined || input.cost === null || input.cost === '' as any ? null : Number(input.cost),
+      offerPrice:
+        input.offerPrice === undefined || input.offerPrice === null || input.offerPrice === '' as any
+          ? null
+          : Number(input.offerPrice),
       currentStock: initialStock,
       minimumStock: Math.max(0, Number(input.minimumStock ?? 0)),
       imageUrl: uploadedImage ? null : (input.imageUrl?.trim() || null),
       imageData: uploadedImage?.buffer ?? null,
       imageMimeType: uploadedImage?.mime ?? null,
+      published: input.published ?? true,
+      featured: input.featured ?? false,
       active: true,
     });
 
@@ -155,7 +181,12 @@ export class CatalogService {
       sku?: string;
       name?: string;
       description?: string | null;
+      brand?: string | null;
       price?: number;
+      cost?: number | null;
+      offerPrice?: number | null;
+      published?: boolean;
+      featured?: boolean;
       categoryId?: string | null;
       minimumStock?: number;
       imageUrl?: string | null;
@@ -176,6 +207,20 @@ export class CatalogService {
     if (input.price !== undefined && (!Number.isFinite(Number(input.price)) || Number(input.price) < 0)) {
       throw new BadRequestException('Precio inválido');
     }
+    if (input.cost !== undefined && input.cost !== null && (!Number.isFinite(Number(input.cost)) || Number(input.cost) < 0)) {
+      throw new BadRequestException('Costo inválido');
+    }
+    if (input.offerPrice !== undefined && input.offerPrice !== null && (!Number.isFinite(Number(input.offerPrice)) || Number(input.offerPrice) < 0)) {
+      throw new BadRequestException('Precio de oferta inválido');
+    }
+    const effectivePrice = input.price !== undefined ? Number(input.price) : Number(product.price);
+    if (
+      input.offerPrice !== undefined &&
+      input.offerPrice !== null &&
+      Number(input.offerPrice) >= effectivePrice
+    ) {
+      throw new BadRequestException('El precio de oferta debe ser menor al precio normal');
+    }
 
     if (
       input.minimumStock !== undefined &&
@@ -190,7 +235,12 @@ export class CatalogService {
       ...(input.sku !== undefined ? { sku: input.sku.trim() } : {}),
       ...(input.name !== undefined ? { name: input.name.trim() } : {}),
       ...(input.description !== undefined ? { description: input.description?.trim() || null } : {}),
+      ...(input.brand !== undefined ? { brand: input.brand?.trim() || null } : {}),
       ...(input.price !== undefined ? { price: Number(input.price) } : {}),
+      ...(input.cost !== undefined ? { cost: input.cost === null ? null : Number(input.cost) } : {}),
+      ...(input.offerPrice !== undefined ? { offerPrice: input.offerPrice === null ? null : Number(input.offerPrice) } : {}),
+      ...(input.published !== undefined ? { published: Boolean(input.published) } : {}),
+      ...(input.featured !== undefined ? { featured: Boolean(input.featured) } : {}),
       ...(input.categoryId !== undefined ? { categoryId: input.categoryId || null } : {}),
       ...(input.minimumStock !== undefined ? { minimumStock: Number(input.minimumStock) } : {}),
       ...(uploadedImage
