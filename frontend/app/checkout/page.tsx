@@ -5,6 +5,7 @@ import { FormEvent, useState } from 'react';
 import { useCart } from '../cart-context';
 import { API_URL } from '../storefront-types';
 import { COMMERCE_SLUG } from '../storefront-config';
+import '../tienda/store.module.css';
 
 type CreatedOrder = {
   id: string;
