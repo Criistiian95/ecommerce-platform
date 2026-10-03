@@ -66,6 +66,7 @@ export class PublicCheckoutService {
     }
 
     const transaction = await Product.sequelize!.transaction();
+    let committed = false;
 
     try {
       const orderLines: Array<{
@@ -153,6 +154,7 @@ export class PublicCheckoutService {
       }
 
       await transaction.commit();
+      committed = true;
 
       try {
         const payment = await this.mercadoPago.createCheckout(
@@ -185,7 +187,7 @@ export class PublicCheckoutService {
         );
       }
     } catch (error) {
-      await transaction.rollback();
+      if (!committed) await transaction.rollback();
       throw error;
     }
   }
