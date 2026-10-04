@@ -31,7 +31,7 @@ export default function CartPage() {
       {message && <div className="cart-alert">{message}</div>}
 
       {items.length === 0 ? (
-        <div className="store-empty">Tu carrito está vacío.</div>
+        <div className="store-empty"><h2>Tu próxima compra empieza acá</h2><p>Todavía no agregaste productos al carrito.</p><Link className="btn primary" href="/tienda">Explorar productos</Link></div>
       ) : (
         <div className="cart-layout">
           <section className="cart-list">
@@ -50,9 +50,9 @@ export default function CartPage() {
                     <span>$ {unitPrice.toLocaleString('es-AR')}</span>
                   </div>
                   <div className="cart-quantity">
-                    <button onClick={() => change(item.product.id, item.quantity - 1)}>−</button>
+                    <button aria-label={`Reducir cantidad de ${item.product.name}`} onClick={() => change(item.product.id, item.quantity - 1)}>−</button>
                     <span>{item.quantity}</span>
-                    <button onClick={() => change(item.product.id, item.quantity + 1)}>+</button>
+                    <button aria-label={`Aumentar cantidad de ${item.product.name}`} onClick={() => change(item.product.id, item.quantity + 1)}>+</button>
                   </div>
                   <div className="cart-line-total">$ {(unitPrice * item.quantity).toLocaleString('es-AR')}</div>
                   <button className="cart-remove" onClick={() => removeProduct(item.product.id)}>Quitar</button>
