@@ -10,32 +10,37 @@ export default function StorefrontClient(){
   const {totalItems}=useCart();
   const [catalog,setCatalog]=useState<StoreCatalog|null>(null);
   const [error,setError]=useState('');
+  const [query,setQuery]=useState('');
+  const [category,setCategory]=useState('');
+  const [sort,setSort]=useState('featured');
+  const [offers,setOffers]=useState(false);
+  const [attempt,setAttempt]=useState(0);
   useEffect(()=>{
-    fetch(`${API_URL}/catalog/store/${COMMERCE_SLUG}`)
+    const controller=new AbortController();setError('');
+    fetch(`${API_URL}/catalog/store/${COMMERCE_SLUG}`,{signal:controller.signal})
       .then(async r=>{if(!r.ok)throw new Error();setCatalog(await r.json());})
-      .catch(()=>setError('No se pudo cargar el catálogo.'));
-  },[]);
-  if(error)return <div className="store-empty">{error}</div>;
-  if(!catalog)return <div className="store-empty">Cargando tienda...</div>;
+      .catch(e=>{if(e.name!=='AbortError')setError('No pudimos cargar los productos. Intentá nuevamente.');});
+    return ()=>controller.abort();
+  },[attempt]);
+  const normalize=(value:string)=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  const products=(catalog?.products??[]).filter(p=>(!category||p.category?.id===category)&&(!offers||(p.offerPrice!==null&&p.offerPrice!==undefined&&Number(p.offerPrice)<Number(p.price)))&&normalize(`${p.name} ${p.brand??''} ${p.category?.name??''}`).includes(normalize(query.trim()))).sort((a,b)=>sort==='low'?Number(a.offerPrice??a.price)-Number(b.offerPrice??b.price):sort==='high'?Number(b.offerPrice??b.price)-Number(a.offerPrice??a.price):sort==='name'?a.name.localeCompare(b.name,'es'):Number(b.featured)-Number(a.featured));
   return <>
+    <div className="store-announcement">TIENDA DEMO · Explorá la experiencia de compra</div>
     <header className="store-header">
-      <div><div className="store-brand">{catalog.commerce.name}</div><small>Tienda online</small></div>
-      <div className="store-header-actions">
-        <Link className="btn secondary" href="/carrito">Carrito ({totalItems})</Link>
-        <a className="btn secondary" href="/login">Administrar</a>
-      </div>
+      <Link href="/tienda" className="store-identity"><span className="store-monogram" aria-hidden="true">{'D'}</span><div><div className="store-brand">Tienda Demo</div><small>E-commerce para tu negocio</small></div></Link>
+      <div className="store-header-actions"><a className="store-nav-link" href="#catalogo">Explorar catálogo</a><Link className="btn primary" href="/carrito">Carrito <span className="cart-count">{totalItems}</span></Link></div>
     </header>
     <section className="store-hero">
-      <span className="eyebrow">CATÁLOGO ONLINE</span>
-      <h1>Encontrá lo que buscás.</h1>
-      <p>Productos, ofertas y destacados del comercio.</p>
+      <div className="hero-copy"><span className="eyebrow">TU MARCA. TU TIENDA ONLINE.</span><h1>Así se ve<br/><em>tu próxima tienda.</em></h1><p>Recorré una tienda de demostración: explorá el catálogo, elegí productos y conocé la experiencia que podés ofrecer a tus clientes.</p><a className="btn primary" href="#catalogo">Explorar la demo <span aria-hidden="true">↗</span></a></div>
+      <div className="hero-art" aria-hidden="true"><div className="art-orbit"></div><div className="art-bag"><span>TU MARCA</span><strong>Tu negocio.<br/>Online.</strong><span className="bag-spark">✳</span></div><div className="art-label">EXPERIENCIA E-COMMERCE</div></div>
     </section>
-    <section className="store-section">
-      <div className="store-section-head"><h2>Productos</h2><span>{catalog.products.length} resultado(s)</span></div>
-      <div className="product-grid">
-        {catalog.products.map(p=><StoreProductCard key={p.id} product={p}/>)}
-      </div>
-      {!catalog.products.length&&<div className="store-empty">No hay productos para mostrar.</div>}
+    <div className="store-benefits"><span><b>01</b> Elegí tus productos</span><span><b>02</b> Armá tu carrito</span><span><b>03</b> Pagá con Mercado Pago</span></div>
+    <section className="store-section" id="catalogo">
+      <div className="store-section-head"><div><span className="eyebrow">EXPLORÁ EL CATÁLOGO</span><h2>Catálogo de demostración</h2></div><span aria-live="polite">{products.length} {products.length===1?'producto':'productos'}</span></div>
+      <div className="catalog-toolbar"><label className="catalog-search"><span aria-hidden="true">⌕</span><input type="search" aria-label="Buscar productos" placeholder="Buscar por producto o marca…" value={query} onChange={e=>setQuery(e.target.value)}/></label><label className="catalog-sort">Ordenar por<select value={sort} onChange={e=>setSort(e.target.value)}><option value="featured">Destacados</option><option value="low">Menor precio</option><option value="high">Mayor precio</option><option value="name">Nombre: A a Z</option></select></label></div>
+      <div className="category-filters" aria-label="Filtros del catálogo"><button className={!category?'active':''} aria-pressed={!category} onClick={()=>setCategory('')}>Todos</button>{catalog?.categories.map(c=><button key={c.id} className={category===c.id?'active':''} aria-pressed={category===c.id} onClick={()=>setCategory(c.id)}>{c.name}</button>)}<button className={offers?'active offer-filter':'offer-filter'} aria-pressed={offers} onClick={()=>setOffers(!offers)}>Solo ofertas</button></div>
+      {error?<div className="store-empty" role="alert"><h3>No pudimos abrir el catálogo</h3><p>{error}</p><button className="btn primary" onClick={()=>setAttempt(n=>n+1)}>Reintentar</button></div>:!catalog?<div className="store-empty" role="status">Estamos preparando el catálogo…</div>:<><div className="product-grid">{products.map(p=><StoreProductCard key={p.id} product={p}/>)}</div>{!products.length&&<div className="store-empty"><h3>{catalog.products.length?'No encontramos coincidencias':'Próximamente, nuevos productos'}</h3><p>{catalog.products.length?'Probá otra búsqueda o cambiá los filtros.':'Volvé a visitarnos para conocer el catálogo.'}</p>{catalog.products.length>0&&<button className="btn secondary" onClick={()=>{setQuery('');setCategory('');setOffers(false);}}>Limpiar filtros</button>}</div>}</>}
     </section>
+    <footer className="store-footer"><div><strong>Tienda Demo</strong><p>Una muestra de cómo puede verse tu comercio online.</p></div><Link href="/carrito">Ver mi carrito</Link><Link href="/login">Acceso para comercios ↗</Link></footer>
   </>;
 }

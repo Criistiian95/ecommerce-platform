@@ -89,15 +89,15 @@ export default function CheckoutPage() {
             <div className="checkout-grid">
               <label className="field">
                 Nombre y apellido
-                <input name="customerName" required />
+                <input name="customerName" autoComplete="name" required />
               </label>
               <label className="field">
                 Teléfono
-                <input name="customerPhone" required />
+                <input name="customerPhone" type="tel" autoComplete="tel" required />
               </label>
               <label className="field full-field">
                 Email
-                <input name="customerEmail" type="email" required />
+                <input name="customerEmail" type="email" autoComplete="email" required />
               </label>
             </div>
 
@@ -129,7 +129,7 @@ export default function CheckoutPage() {
             {deliveryMethod === 'shipping' && (
               <label className="field">
                 Dirección
-                <input name="address" required placeholder="Calle, número, localidad" />
+                <input name="address" autoComplete="street-address" required placeholder="Calle, número, localidad" />
               </label>
             )}
 
@@ -160,7 +160,7 @@ export default function CheckoutPage() {
             <span>Total</span>
             <strong>$ {subtotal.toLocaleString('es-AR')}</strong>
           </div>
-          <small>El total se vuelve a calcular en el servidor antes de crear el pedido.</small>
+          <small>Revisá los productos y tus datos antes de continuar al pago.</small>
         </aside>
       </div>
     </main>

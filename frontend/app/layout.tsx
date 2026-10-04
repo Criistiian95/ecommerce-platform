@@ -3,7 +3,7 @@ import { CartProvider } from './cart-context';
 
 export const metadata = {
   title: 'Tienda Demo',
-  description: 'Base comercial e-commerce multi-comercio',
+  description: 'Explorá una tienda de demostración y conocé la experiencia e-commerce para tu negocio.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
