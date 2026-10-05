@@ -165,6 +165,7 @@ export default function AdminOrdersPage() {
           <small>Gestión de pedidos y ventas</small>
         </div>
         <div className="admin-nav-actions">
+          <Link className="btn secondary" href="/admin/dashboard">Dashboard</Link>
           <Link className="btn secondary" href="/admin">Productos</Link>
           <Link className="btn secondary" href="/admin/clientes">Clientes</Link>
           <Link className="btn secondary" href="/">Ver tienda</Link>
