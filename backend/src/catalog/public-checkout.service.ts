@@ -7,6 +7,7 @@ import { Order } from '../database/models/order.model';
 import { OrderItem } from '../database/models/order-item.model';
 import { Product } from '../database/models/product.model';
 import { StockMovement } from '../database/models/stock-movement.model';
+import { User } from '../database/models/user.model';
 import { MercadoPagoService } from './mercado-pago.service';
 
 type CheckoutInput = {
@@ -68,7 +69,7 @@ export class PublicCheckoutService {
       payment: { mpOrderId: order.mpOrderId, checkoutUrl: order.mpCheckoutUrl } };
   }
 
-  async createOrder(slug: string, input: CheckoutInput) {
+  async createOrder(slug: string, input: CheckoutInput, customerId?: string | null) {
     this.validateCustomer(input);
 
     const commerce = await Commerce.findOne({
@@ -80,6 +81,29 @@ export class PublicCheckoutService {
       throw new NotFoundException('Comercio no encontrado');
     }
 
+    const account = customerId
+      ? await User.findOne({
+          where: {
+            id: customerId,
+            commerceId: commerce.id,
+            role: 'customer',
+            active: true,
+          },
+        })
+      : null;
+
+    const customerName = account?.name?.trim() || input.customerName.trim();
+    const customerEmail = account?.email?.trim().toLowerCase() || input.customerEmail.trim().toLowerCase();
+    const customerPhone = input.customerPhone.trim() || account?.phone?.trim() || '';
+
+    if (!customerPhone) {
+      throw new BadRequestException('El teléfono es obligatorio');
+    }
+
+    if (account && customerPhone !== account.phone) {
+      await account.update({ phone: customerPhone });
+    }
+
     const cleanItems = normalizeCartItems(input.items);
 
     if (!cleanItems.length) {
@@ -88,8 +112,8 @@ export class PublicCheckoutService {
 
     const checkoutKey = createHash('sha256').update(`${commerce.id}:${input.checkoutKey}`).digest('hex');
     const checkoutHash = createHash('sha256').update(JSON.stringify({
-      customerName: input.customerName.trim(), customerEmail: input.customerEmail.trim().toLowerCase(),
-      customerPhone: input.customerPhone.trim(), deliveryMethod: input.deliveryMethod,
+      customerName, customerEmail,
+      customerPhone, customerId: account?.id ?? null, deliveryMethod: input.deliveryMethod,
       address: input.deliveryMethod === 'shipping' ? input.address?.trim() || null : null,
       notes: input.notes?.trim() || null, items: cleanItems,
     })).digest('hex');
@@ -103,15 +127,16 @@ export class PublicCheckoutService {
 
       const order = await Order.create({
         commerceId: commerce.id,
+        customerId: account?.id ?? null,
         checkoutKey, checkoutHash,
         reservationExpiresAt: new Date(Date.now() + 30 * 60 * 1000),
         reservationCheckedAt: new Date(),
         orderNumber,
         status: 'pending_payment',
         paymentStatus: 'pending',
-        customerName: input.customerName.trim(),
-        customerEmail: input.customerEmail.trim().toLowerCase(),
-        customerPhone: input.customerPhone.trim(),
+        customerName,
+        customerEmail,
+        customerPhone,
         deliveryMethod: input.deliveryMethod,
         address: input.deliveryMethod === 'shipping' ? input.address?.trim() || null : null,
         notes: input.notes?.trim() || null,
