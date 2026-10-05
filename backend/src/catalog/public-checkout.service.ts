@@ -74,11 +74,18 @@ export class PublicCheckoutService {
 
     const commerce = await Commerce.findOne({
       where: { slug, active: true },
-      attributes: ['id', 'name'],
+      attributes: ['id', 'name', 'pickupEnabled', 'shippingEnabled'],
     });
 
     if (!commerce) {
       throw new NotFoundException('Comercio no encontrado');
+    }
+
+    if (input.deliveryMethod === 'pickup' && !commerce.pickupEnabled) {
+      throw new BadRequestException('El retiro por el comercio no está disponible');
+    }
+    if (input.deliveryMethod === 'shipping' && !commerce.shippingEnabled) {
+      throw new BadRequestException('El envío a domicilio no está disponible');
     }
 
     const account = customerId
