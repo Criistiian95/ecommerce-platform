@@ -1,3 +1,5 @@
+import { assertMigrationsCurrent } from './migrations/runner';
+import { OrderEmailDelivery } from './models/order-email-delivery.model';
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { Sequelize } from 'sequelize';
@@ -41,6 +43,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     StockMovement.register(this.sequelize);
     Order.register(this.sequelize);
     OrderItem.register(this.sequelize);
+    OrderEmailDelivery.register(this.sequelize);
 
     Commerce.hasMany(User, { foreignKey: 'commerceId', as: 'users' });
     User.belongsTo(Commerce, { foreignKey: 'commerceId', as: 'commerce' });
@@ -142,91 +145,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     console.log(`Demo commerce bootstrapped: ${commerceSlug}`);
   }
 
-  private async ensureProductColumns() {
-    const addColumnIfMissing = async (column: string, definition: string) => {
-      const [columns] = await this.sequelize.query(`SHOW COLUMNS FROM products LIKE '${column}'`);
-      if ((columns as unknown[]).length === 0) {
-        await this.sequelize.query(`ALTER TABLE products ADD COLUMN ${definition}`);
-      }
-    };
-
-    await addColumnIfMissing('image_data', 'image_data MEDIUMBLOB NULL AFTER image_url');
-    await addColumnIfMissing('image_mime_type', 'image_mime_type VARCHAR(60) NULL AFTER image_data');
-    await addColumnIfMissing('brand', 'brand VARCHAR(120) NULL AFTER description');
-    await addColumnIfMissing('cost', 'cost DECIMAL(14,2) NULL AFTER price');
-    await addColumnIfMissing('offer_price', 'offer_price DECIMAL(14,2) NULL AFTER cost');
-    await addColumnIfMissing('published', 'published TINYINT(1) NOT NULL DEFAULT 1 AFTER image_mime_type');
-    await addColumnIfMissing('featured', 'featured TINYINT(1) NOT NULL DEFAULT 0 AFTER published');
-
-    const [userIdColumn] = await this.sequelize.query("SHOW COLUMNS FROM stock_movements LIKE 'user_id'");
-    if ((userIdColumn as any[])[0]?.Null === 'NO') {
-      await this.sequelize.query('ALTER TABLE stock_movements MODIFY user_id CHAR(36) BINARY NULL');
-    }
-  }
-
-
-  private async ensureOrderPaymentColumns() {
-    const addColumnIfMissing = async (column: string, definition: string) => {
-      const [columns] = await this.sequelize.query(`SHOW COLUMNS FROM orders LIKE '${column}'`);
-      if ((columns as unknown[]).length === 0) {
-        await this.sequelize.query(`ALTER TABLE orders ADD COLUMN ${definition}`);
-      }
-    };
-
-
-
-    await this.sequelize.query(
-      "ALTER TABLE orders MODIFY status ENUM('pending','pending_payment','confirmed','preparing','shipped','delivered','cancelled') NOT NULL DEFAULT 'pending_payment'"
-    );
-    await addColumnIfMissing(
-      'payment_status',
-      "payment_status ENUM('pending','paid','rejected','cancelled','refunded') NOT NULL DEFAULT 'pending' AFTER status"
-    );
-    await addColumnIfMissing(
-      'mp_order_id',
-      "mp_order_id VARCHAR(100) NULL AFTER payment_status"
-    );
-    await addColumnIfMissing(
-      'mp_checkout_url',
-      "mp_checkout_url VARCHAR(1000) NULL AFTER mp_order_id"
-    );
-    await addColumnIfMissing(
-      'paid_at',
-      "paid_at DATETIME NULL AFTER mp_checkout_url"
-    );
-
-    await this.sequelize.query(
-      "ALTER TABLE stock_movements MODIFY type ENUM('initial','adjustment','sale','return','reservation','release') NOT NULL DEFAULT 'adjustment'"
-    );
-  }
-
-  private async ensureCheckoutColumns() {
-    const [tables] = await this.sequelize.query("SHOW TABLES LIKE 'orders'");
-    if (!(tables as unknown[]).length) return;
-    const columns = [
-      ['checkout_key', 'checkout_key VARCHAR(64) NULL, ADD UNIQUE KEY uq_orders_checkout_key (checkout_key)'],
-      ['checkout_hash', 'checkout_hash VARCHAR(64) NULL'],
-      ['reservation_expires_at', 'reservation_expires_at DATETIME NULL'],
-      ['reservation_checked_at', 'reservation_checked_at DATETIME NULL'],
-      ['payment_review_required', 'payment_review_required TINYINT(1) NOT NULL DEFAULT 0'],
-    ];
-    for (const [name, definition] of columns) {
-      const [found] = await this.sequelize.query(`SHOW COLUMNS FROM orders LIKE '${name}'`);
-      if (!(found as unknown[]).length) await this.sequelize.query(`ALTER TABLE orders ADD COLUMN ${definition}`);
-    }
-  }
-
   async onModuleInit() {
     await this.authenticateWithRetry();
-    // Existing tables need the columns before sync can create their indexes.
-    await this.ensureCheckoutColumns();
-
-    if (process.env.DB_SYNC === 'true') {
-      await this.sequelize.sync();
-    }
-
-    await this.ensureProductColumns();
-    await this.ensureOrderPaymentColumns();
+    await assertMigrationsCurrent(this.sequelize);
     await this.bootstrapDemoCommerce();
   }
 

@@ -1,3 +1,4 @@
+import { OrderEmailDelivery } from '../database/models/order-email-delivery.model';
 import { Injectable } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { Commerce } from '../database/models/commerce.model';
@@ -261,35 +262,11 @@ export class MercadoPagoService {
         },
       );
 
+      // Durable outbox entry is committed atomically with payment and stock.
+      await this.orderEmail.enqueue(lockedOrder, transaction);
       await transaction.commit();
       committed = true;
 
-      const commerce = await Commerce.findByPk(lockedOrder.commerceId, {
-        attributes: ['name'],
-      });
-      const items = await OrderItem.findAll({
-        where: { orderId: lockedOrder.id },
-      });
-
-      if (commerce) {
-        void this.orderEmail.sendConfirmation({
-          commerceName: commerce.name,
-          orderNumber: lockedOrder.orderNumber,
-          customerName: lockedOrder.customerName,
-          customerEmail: lockedOrder.customerEmail,
-          deliveryMethod: lockedOrder.deliveryMethod,
-          address: lockedOrder.address,
-          total: Number(lockedOrder.total),
-          items: items.map(item => ({
-            name: item.productName,
-            quantity: item.quantity,
-            unitPrice: Number(item.unitPrice),
-            lineTotal: Number(item.lineTotal),
-          })),
-        }).catch(error => {
-          console.error('Paid order confirmation email failed', error);
-        });
-      }
     } catch (error) {
       if (!committed) await transaction.rollback();
       throw error;
@@ -428,12 +405,14 @@ export class MercadoPagoService {
       }
     }
 
+    const email = await OrderEmailDelivery.findOne({ where: { orderId: order.id }, attributes: ['status'] });
     return {
       id: order.id,
       orderNumber: order.orderNumber,
       status: order.status,
       paymentStatus: order.paymentStatus,
       paymentReviewRequired: order.paymentReviewRequired,
+      emailStatus: email?.status ?? 'unknown',
       total: Number(order.total),
       deliveryMethod: order.deliveryMethod,
       checkoutUrl:

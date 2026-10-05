@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "start": "node dist/main.js",
+    "start": "npm run migrate && node dist/main.js",
     "start:dev": "nest start --watch",
     "build": "nest build",
     "test": "npm run build && node --test test/*.test.cjs",
-    "test:mysql": "npm run build && node --test test/mysql.integration.cjs"
+    "test:mysql": "npm run build && node --test test/mysql.integration.cjs",
+    "migrate": "node dist/database/migrate.js"
   },
   "dependencies": {
     "@nestjs/common": "12.1.2",

@@ -13,7 +13,7 @@
 
 ## Actualización
 
-Se agregan columnas anulables de clave/hash/vencimiento/última revisión y una bandera de revisión de pago. Las columnas de pedidos existentes se agregan antes de `sync`; la clave es única. No se borran pedidos. Se mantiene el mecanismo de actualización actual; migraciones versionadas quedan para la próxima etapa.
+Se agregan columnas anulables de clave/hash/vencimiento/última revisión y una bandera de revisión de pago. La clave es única. No se borran pedidos. Las actualizaciones se ejecutan mediante migraciones versionadas; ver EMAIL_AND_MIGRATIONS.md.
 
 Desplegar backend antes del frontend y recargar pestañas antiguas. Mantener disponibles las credenciales MP ya existentes. No se requieren nuevas credenciales. El worker necesita el backend activo para ejecutar a intervalos regulares.
 

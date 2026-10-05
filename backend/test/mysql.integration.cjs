@@ -1,4 +1,4 @@
-const { test, before, after } = require('node:test');
+const { test, before, after, afterEach, mock } = require('node:test');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const target = new URL(process.env.TEST_DATABASE_URL || 'mysql://localhost/missing');
@@ -19,7 +19,9 @@ const { OrderItem } = require('../dist/database/models/order-item.model');
 const { StockMovement } = require('../dist/database/models/stock-movement.model');
 const { User } = require('../dist/database/models/user.model');
 const db = new DatabaseService();
-before(async () => { await db.onModuleInit(); });
+const { runMigrations } = require('../dist/database/migrations/runner');
+before(async () => { await runMigrations(db.sequelize); await db.onModuleInit(); });
+afterEach(() => mock.restoreAll());
 after(async () => { await db.onModuleDestroy(); });
 async function fixture(stock = 10) {
   const commerce = await Commerce.create({ name: 'Test', slug: randomUUID(), active: true });
@@ -34,12 +36,20 @@ async function fixture(stock = 10) {
   const request = { checkoutKey: randomUUID(), customerName: 'Test', customerEmail: 'test@example.com', customerPhone: '123', deliveryMethod: 'pickup', items: [{ productId: product.id, quantity: 2 }] };
   return { commerce, user, product, checkout, request, preferences: () => preferences };
 }
-test('MySQL: existing schema upgrades before sync and restart is repeatable', async () => {
+test('MySQL: versioned legacy upgrade is repeatable and startup is read-only', async () => {
   for (const column of ['checkout_key', 'checkout_hash', 'reservation_expires_at', 'reservation_checked_at', 'payment_review_required']) {
     await db.sequelize.query(`ALTER TABLE orders DROP COLUMN ${column}`);
   }
+  await db.sequelize.query("DELETE FROM schema_migrations WHERE version = '002_legacy_checkout'");
+  await assert.rejects(db.onModuleInit(), /migrations pending/);
+  await Promise.all([runMigrations(db.sequelize), runMigrations(db.sequelize)]);
+  const original = db.sequelize.query.bind(db.sequelize);
+  const statements = [];
+  mock.method(db.sequelize, 'query', (...args) => { statements.push(args[0]); return original(...args); });
   await db.onModuleInit();
-  await db.onModuleInit();
+  assert.equal(statements.some(sql => /ALTER|CREATE|DROP/i.test(sql)), false);
+  const [versions] = await original('SELECT version FROM schema_migrations');
+  assert.equal(versions.length, 3);
   const [indexes] = await db.sequelize.query("SHOW INDEX FROM orders WHERE Column_name = 'checkout_key'");
   assert.ok(indexes.some(index => index.Non_unique === 0));
 });
@@ -79,4 +89,61 @@ test('MySQL: concurrent releases return stock once', async () => {
   await Promise.all([payments.releaseReservation(first, 'cancelled'), payments.releaseReservation(second, 'cancelled')]);
   assert.equal((await f.product.reload()).currentStock, 10);
   assert.equal(await StockMovement.count({ where: { productId: f.product.id, type: 'release' } }), 1);
+});
+
+const { OrderEmailDelivery } = require('../dist/database/models/order-email-delivery.model');
+const { OrderEmailService } = require('../dist/catalog/order-email.service');
+const { OrderEmailWorker } = require('../dist/catalog/order-email-worker.service');
+async function paidFixture() {
+  const f = await fixture(); const result = await f.checkout.createOrder(f.commerce.slug, f.request);
+  const order = await Order.findByPk(result.order.id);
+  const email = new OrderEmailService(); const mp = new MercadoPagoService(email);
+  await mp.confirmPaidOrder(order);
+  return { ...f, order, email, mp, delivery: await OrderEmailDelivery.findOne({ where: { orderId: order.id } }) };
+}
+function configured() { process.env.RESEND_API_KEY = 'unit-test-only'; process.env.ORDER_EMAIL_FROM = 'Demo <test@example.com>'; }
+test('MySQL: payment and email scheduling are atomic, duplicate notifications schedule once', async () => {
+  const f = await paidFixture();
+  await f.mp.confirmPaidOrder(await Order.findByPk(f.order.id));
+  assert.equal(await OrderEmailDelivery.count({ where: { orderId: f.order.id } }), 1);
+  assert.equal(f.delivery.status, 'pending');
+  assert.equal((await f.order.reload()).paymentStatus, 'paid');
+  const broken = await fixture(); const result = await broken.checkout.createOrder(broken.commerce.slug, broken.request);
+  const order = await Order.findByPk(result.order.id);
+  await assert.rejects(new MercadoPagoService({ enqueue: async () => { throw new Error('outbox unavailable'); } }).confirmPaidOrder(order), /outbox unavailable/);
+  assert.equal((await order.reload()).paymentStatus, 'pending');
+  assert.equal(await StockMovement.count({ where: { productId: broken.product.id, type: 'sale' } }), 0);
+});
+test('MySQL: two email workers claim one message; retry keeps the exact body and key', async () => {
+  // Isolate due messages created by earlier tests without deleting their records.
+  await OrderEmailDelivery.update({ nextAttemptAt: new Date(Date.now() + 86400000) }, { where: { status: 'pending' } });
+  const f = await paidFixture(); configured();
+  const bodies = []; const keys = [];
+  mock.method(f.email, 'sendMessage', async (body, key) => { bodies.push(body); keys.push(key); return { retryable: true, error: 'temporary' }; });
+  await Promise.all([new OrderEmailWorker(f.email).run(), new OrderEmailWorker(f.email).run()]);
+  assert.equal(bodies.length, 1);
+  await f.delivery.reload(); assert.equal(f.delivery.status, 'pending'); assert.equal(f.delivery.attempts, 1);
+  await f.delivery.update({ nextAttemptAt: new Date(0) });
+  process.env.ORDER_EMAIL_FROM = 'Changed <changed@example.com>';
+  mock.method(f.email, 'sendMessage', async (body, key) => { bodies.push(body); keys.push(key); return { id: 'resend-id', retryable: false }; });
+  await new OrderEmailWorker(f.email).run();
+  assert.deepEqual(bodies[0], bodies[1]); assert.equal(keys[0], keys[1]);
+  await f.delivery.reload(); assert.equal(f.delivery.status, 'sent'); assert.equal(f.delivery.providerMessageId, 'resend-id');
+  await new OrderEmailWorker(f.email).run(); assert.equal(bodies.length, 2);
+});
+test('MySQL: abandoned send lease is recovered; expired idempotency window requires review', async () => {
+  const f = await paidFixture(); configured();
+  await f.delivery.update({ status: 'sending', leaseUntil: new Date(0), leaseToken: 'old', attempts: 1,
+    firstAttemptAt: new Date(), message: JSON.stringify(f.email.buildMessage(f.delivery.payload, process.env.ORDER_EMAIL_FROM)) });
+  const send = mock.method(f.email, 'sendMessage', async () => ({ id: 'recovered', retryable: false }));
+  await new OrderEmailWorker(f.email).run(); assert.equal(send.mock.callCount(), 1); assert.equal((await f.delivery.reload()).status, 'sent');
+  const old = await paidFixture(); await old.delivery.update({ firstAttemptAt: new Date(Date.now() - 21 * 3600000), attempts: 1 });
+  await new OrderEmailWorker(f.email).run(); assert.equal(send.mock.callCount(), 1); assert.equal((await old.delivery.reload()).status, 'failed');
+});
+test('MySQL: missing credentials do not consume attempts; refunded order does not send confirmation', async () => {
+  const f = await paidFixture(); delete process.env.RESEND_API_KEY;
+  const send = mock.method(f.email, 'sendMessage', async () => { throw new Error('must not send'); });
+  await new OrderEmailWorker(f.email).run(); assert.equal((await f.delivery.reload()).attempts, 0);
+  configured(); await f.order.update({ paymentStatus: 'refunded' });
+  await new OrderEmailWorker(f.email).run(); assert.equal(send.mock.callCount(), 0); assert.equal((await f.delivery.reload()).lastError, 'order_not_confirmed');
 });

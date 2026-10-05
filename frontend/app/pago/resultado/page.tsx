@@ -13,6 +13,7 @@ type PaymentStatus = {
   status: string;
   paymentStatus: 'pending' | 'paid' | 'rejected' | 'cancelled' | 'refunded';
   paymentReviewRequired?: boolean;
+  emailStatus?: 'pending' | 'sending' | 'sent' | 'failed' | 'unknown';
   total: number;
   deliveryMethod: 'pickup' | 'shipping';
   checkoutUrl?: string | null;
@@ -79,8 +80,8 @@ export default function PaymentResultPage() {
 
       if (
         !stopped &&
-        data?.paymentStatus === 'pending' &&
-        attempts < 6
+        (data?.paymentStatus === 'pending' || (data?.paymentStatus === 'paid' && ['pending', 'sending'].includes(data.emailStatus ?? ''))) &&
+        attempts < (data.paymentStatus === 'paid' ? 18 : 6)
       ) {
         window.setTimeout(check, 2500);
       }
@@ -131,7 +132,13 @@ export default function PaymentResultPage() {
 
         {paid && (
           <p className="checkout-muted payment-confirmation-note">
-            Te enviamos la confirmación del pedido al email ingresado en el checkout.
+            {status?.emailStatus === 'sent'
+              ? 'Enviamos la confirmación al email ingresado. Revisá también la carpeta de spam.'
+              : status?.emailStatus === 'pending' || status?.emailStatus === 'sending'
+                ? 'Tu pago está confirmado. El correo de confirmación está pendiente de envío.'
+                : status?.emailStatus === 'failed'
+                  ? 'Tu pago está confirmado. El envío del correo requiere revisión del comercio; conservá tu número de pedido.'
+                  : 'Tu pago está confirmado. No tenemos registrado el estado del correo de este pedido.'}
           </p>
         )}
       </section>

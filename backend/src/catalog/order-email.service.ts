@@ -1,4 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import type { Transaction } from 'sequelize';
+import { OrderEmailDelivery } from '../database/models/order-email-delivery.model';
+import { Order } from '../database/models/order.model';
+import { OrderItem } from '../database/models/order-item.model';
+import { Commerce } from '../database/models/commerce.model';
 
 type ConfirmationLine = {
   name: string;
@@ -7,7 +12,7 @@ type ConfirmationLine = {
   lineTotal: number;
 };
 
-type ConfirmationInput = {
+export type ConfirmationInput = {
   commerceName: string;
   orderNumber: string;
   customerName: string;
@@ -37,15 +42,21 @@ export class OrderEmailService {
     }).format(value);
   }
 
-  async sendConfirmation(input: ConfirmationInput) {
-    const apiKey = process.env.RESEND_API_KEY;
-    const from = process.env.ORDER_EMAIL_FROM;
+  async enqueue(order: Order, transaction: Transaction) {
+    const commerce = await Commerce.findByPk(order.commerceId, { attributes: ['name'], transaction });
+    if (!commerce) throw new Error('Commerce missing while scheduling order confirmation');
+    const items = await OrderItem.findAll({ where: { orderId: order.id }, order: [['id', 'ASC']], transaction });
+    const payload: ConfirmationInput = {
+      commerceName: commerce.name, orderNumber: order.orderNumber,
+      customerName: order.customerName, customerEmail: order.customerEmail,
+      deliveryMethod: order.deliveryMethod, address: order.address, total: Number(order.total),
+      items: items.map(item => ({ name: item.productName, quantity: item.quantity,
+        unitPrice: Number(item.unitPrice), lineTotal: Number(item.lineTotal) })),
+    };
+    await OrderEmailDelivery.create({ orderId: order.id, payload, status: 'pending', nextAttemptAt: new Date() }, { transaction });
+  }
 
-    if (!apiKey || !from) {
-      console.warn('Order confirmation email skipped: RESEND_API_KEY or ORDER_EMAIL_FROM missing');
-      return false;
-    }
-
+  buildMessage(input: ConfirmationInput, from: string) {
     const itemsHtml = input.items
       .map(item => `
         <tr>
@@ -104,30 +115,22 @@ export class OrderEmailService {
       `Entrega: ${delivery.replace(/<[^>]*>/g, '')}`,
     ].join('\n');
 
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from,
-        to: [input.customerEmail],
-        subject: `Pago confirmado - Pedido ${input.orderNumber}`,
-        html,
-        text,
-        tags: [
-          { name: 'category', value: 'order_confirmation' },
-        ],
-      }),
-    });
+    return { from, to: [input.customerEmail], subject: `Pago confirmado - Pedido ${input.orderNumber}`,
+      html, text, tags: [{ name: 'category', value: 'order_confirmation' }] };
+  }
 
-    if (!response.ok) {
-      const detail = await response.text().catch(() => '');
-      console.error('Order confirmation email failed', response.status, detail);
-      return false;
-    }
-
-    return true;
+  async sendMessage(message: string, key: string): Promise<{ id?: string; retryable: boolean; error?: string }> {
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST', signal: AbortSignal.timeout(15000),
+        headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': key },
+        body: message,
+      });
+      const body = await response.json().catch(() => null) as { id?: string; name?: string } | null;
+      if (response.ok && body?.id) return { id: body.id, retryable: false };
+      const retryable = response.ok || response.status === 408 || response.status === 429 || response.status >= 500 ||
+        (response.status === 409 && body?.name === 'concurrent_idempotent_requests');
+      return { retryable, error: `provider_http_${response.status}` };
+    } catch { return { retryable: true, error: 'provider_network_error' }; }
   }
 }
