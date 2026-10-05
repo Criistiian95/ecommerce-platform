@@ -127,6 +127,7 @@ export default function AdminCustomersPage(){
           <Link className="admin-nav-link" href="/admin">Productos</Link>
           <Link className="admin-nav-link" href="/admin/pedidos">Pedidos</Link>
           <Link className="admin-nav-link active" href="/admin/clientes">Clientes</Link>
+          <Link className="admin-nav-link" href="/admin/configuracion">Configuración</Link>
           <Link className="admin-store-link" href="/">↗ Ver tienda</Link>
         </nav>
       </header>
