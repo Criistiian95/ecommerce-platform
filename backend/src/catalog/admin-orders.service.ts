@@ -195,6 +195,7 @@ export class AdminOrdersService {
       subtotal: Number(plain.subtotal),
       total: Number(plain.total),
       paidAt: plain.paidAt,
+      paymentReviewRequired: Boolean(plain.paymentReviewRequired),
       createdAt: plain.createdAt,
       items: (plain.items ?? []).map((item: any) => ({
         id: item.id,
