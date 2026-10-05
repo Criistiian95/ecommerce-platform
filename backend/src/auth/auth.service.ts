@@ -191,6 +191,38 @@ export class AuthService {
     return this.customerProfile(user.id);
   }
 
+  async resolveCustomerAuthorization(
+    authorization: string | undefined,
+    commerceSlug: string,
+  ) {
+    if (!authorization?.startsWith('Bearer ')) return null;
+
+    try {
+      const payload = this.verifyToken(authorization.slice(7));
+      if (payload.role !== 'customer') return null;
+
+      const session = await Session.findByPk(payload.sid);
+      if (!session || session.revokedAt || session.expiresAt < new Date()) return null;
+
+      const commerce = await Commerce.findOne({
+        where: { slug: commerceSlug.trim().toLowerCase(), active: true },
+        attributes: ['id'],
+      });
+      if (!commerce || payload.commerceId !== commerce.id) return null;
+
+      return await User.findOne({
+        where: {
+          id: payload.sub,
+          commerceId: commerce.id,
+          role: 'customer',
+          active: true,
+        },
+      });
+    } catch {
+      return null;
+    }
+  }
+
   async createInitialAdmin(input: {
     commerceName: string;
     commerceSlug: string;
