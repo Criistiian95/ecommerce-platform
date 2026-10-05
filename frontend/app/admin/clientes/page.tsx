@@ -122,12 +122,13 @@ export default function AdminCustomersPage(){
           <div className="brand">Panel del comercio</div>
           <small>Clientes e historial de compras</small>
         </div>
-        <div className="admin-nav-actions">
-          <Link className="btn secondary" href="/admin/dashboard">Dashboard</Link>
-          <Link className="btn secondary" href="/admin">Productos</Link>
-          <Link className="btn secondary" href="/admin/pedidos">Pedidos</Link>
-          <Link className="btn secondary" href="/">Ver tienda</Link>
-        </div>
+        <nav className="admin-nav" aria-label="Navegación del panel">
+          <Link className="admin-nav-link" href="/admin/dashboard">Dashboard</Link>
+          <Link className="admin-nav-link" href="/admin">Productos</Link>
+          <Link className="admin-nav-link" href="/admin/pedidos">Pedidos</Link>
+          <Link className="admin-nav-link active" href="/admin/clientes">Clientes</Link>
+          <Link className="admin-store-link" href="/">↗ Ver tienda</Link>
+        </nav>
       </header>
 
       {toast && (
