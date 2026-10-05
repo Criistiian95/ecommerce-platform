@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import styles from './orders.module.css';
 
 type OrderItem = {
   id: string;
@@ -157,7 +158,7 @@ export default function AdminOrdersPage() {
   }
 
   return (
-    <main className="shell orders-admin-shell">
+    <main className={`${styles.root} shell orders-admin-shell`}>
       <header className="topbar">
         <div>
           <div className="brand">Panel del comercio</div>
