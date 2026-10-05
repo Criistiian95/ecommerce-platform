@@ -2,12 +2,14 @@
 import {useEffect,useState} from 'react';
 import Link from 'next/link';
 import {useCart} from './cart-context';
+import {useCustomerAuth} from './customer-auth-context';
 import StoreProductCard from './store-product-card';
 import {API_URL,StoreCatalog} from './storefront-types';
 import {COMMERCE_SLUG} from './storefront-config';
 
 export default function StorefrontClient(){
   const {totalItems}=useCart();
+  const {user}=useCustomerAuth();
   const [catalog,setCatalog]=useState<StoreCatalog|null>(null);
   const [error,setError]=useState('');
   const [query,setQuery]=useState('');
@@ -28,7 +30,7 @@ export default function StorefrontClient(){
     <div className="store-announcement">TIENDA DEMO · Explorá la experiencia de compra</div>
     <header className="store-header">
       <Link href="/tienda" className="store-identity"><span className="store-monogram" aria-hidden="true">{'D'}</span><div><div className="store-brand">Tienda Demo</div><small>E-commerce para tu negocio</small></div></Link>
-      <div className="store-header-actions"><a className="store-nav-link" href="#catalogo">Explorar catálogo</a><Link className="btn primary" href="/carrito">Carrito <span className="cart-count">{totalItems}</span></Link></div>
+      <div className="store-header-actions"><a className="store-nav-link" href="#catalogo">Explorar catálogo</a><Link className="store-nav-link" href={user?'/mi-cuenta':'/cliente/login'}>{user?'Mi cuenta':'Ingresar'}</Link><Link className="btn primary" href="/carrito">Carrito <span className="cart-count">{totalItems}</span></Link></div>
     </header>
     <section className="store-hero">
       <div className="hero-copy"><span className="eyebrow">TU MARCA. TU TIENDA ONLINE.</span><h1>Así se ve<br/><em>tu próxima tienda.</em></h1><p>Recorré una tienda de demostración: explorá el catálogo, elegí productos y conocé la experiencia que podés ofrecer a tus clientes.</p><a className="btn primary" href="#catalogo">Explorar la demo <span aria-hidden="true">↗</span></a></div>
@@ -41,6 +43,6 @@ export default function StorefrontClient(){
       <div className="category-filters" aria-label="Filtros del catálogo"><button className={!category?'active':''} aria-pressed={!category} onClick={()=>setCategory('')}>Todos</button>{catalog?.categories.map(c=><button key={c.id} className={category===c.id?'active':''} aria-pressed={category===c.id} onClick={()=>setCategory(c.id)}>{c.name}</button>)}<button className={offers?'active offer-filter':'offer-filter'} aria-pressed={offers} onClick={()=>setOffers(!offers)}>Solo ofertas</button></div>
       {error?<div className="store-empty" role="alert"><h3>No pudimos abrir el catálogo</h3><p>{error}</p><button className="btn primary" onClick={()=>setAttempt(n=>n+1)}>Reintentar</button></div>:!catalog?<div className="store-empty" role="status">Estamos preparando el catálogo…</div>:<><div className="product-grid">{products.map(p=><StoreProductCard key={p.id} product={p}/>)}</div>{!products.length&&<div className="store-empty"><h3>{catalog.products.length?'No encontramos coincidencias':'Próximamente, nuevos productos'}</h3><p>{catalog.products.length?'Probá otra búsqueda o cambiá los filtros.':'Volvé a visitarnos para conocer el catálogo.'}</p>{catalog.products.length>0&&<button className="btn secondary" onClick={()=>{setQuery('');setCategory('');setOffers(false);}}>Limpiar filtros</button>}</div>}</>}
     </section>
-    <footer className="store-footer"><div><strong>Tienda Demo</strong><p>Una muestra de cómo puede verse tu comercio online.</p></div><Link href="/carrito">Ver mi carrito</Link><Link href="/login">Acceso para comercios ↗</Link></footer>
+    <footer className="store-footer"><div><strong>Tienda Demo</strong><p>Una muestra de cómo puede verse tu comercio online.</p></div><Link href={user?'/mi-cuenta':'/cliente/login'}>{user?'Mi cuenta':'Cuenta cliente'}</Link><Link href="/carrito">Ver mi carrito</Link><Link href="/login">Acceso para comercios ↗</Link></footer>
   </>;
 }
