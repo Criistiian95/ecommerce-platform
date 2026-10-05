@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useRef, useState } from 'react';
+import { CSSProperties, FormEvent, useEffect, useRef, useState } from 'react';
 import { useCart } from '../cart-context';
 import { useCustomerAuth } from '../customer-auth-context';
-import { API_URL } from '../storefront-types';
+import { API_URL, StoreCatalog } from '../storefront-types';
 import { COMMERCE_SLUG } from '../storefront-config';
 import '../tienda/store.module.css';
 
@@ -16,6 +16,27 @@ export default function CheckoutPage() {
   const [message, setMessage] = useState('');
   const submitting = useRef(false);
   const [pendingOrderId, setPendingOrderId] = useState('');
+  const [commerce,setCommerce]=useState<StoreCatalog['commerce']|null>(null);
+
+  useEffect(()=>{
+    const controller=new AbortController();
+    fetch(`${API_URL}/catalog/store/${COMMERCE_SLUG}`,{signal:controller.signal})
+      .then(async response=>{
+        if(!response.ok) throw new Error();
+        const catalog:StoreCatalog=await response.json();
+        setCommerce(catalog.commerce);
+        if(!catalog.commerce.pickupEnabled && catalog.commerce.shippingEnabled){
+          setDeliveryMethod('shipping');
+        }
+      })
+      .catch(()=>null);
+    return ()=>controller.abort();
+  },[]);
+
+  const themeStyle={
+    '--accent':commerce?.primaryColor || '#245ce6',
+    '--ink':commerce?.secondaryColor || '#172238',
+  } as CSSProperties;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -100,7 +121,7 @@ export default function CheckoutPage() {
   }
 
   return (
-    <main className="store-shell">
+    <main className="store-shell" style={themeStyle}>
       <Link href="/carrito" className="store-link">← Volver al carrito</Link>
       <div className="checkout-layout">
         <section className="checkout-card">
@@ -128,27 +149,31 @@ export default function CheckoutPage() {
 
             <h3>Entrega</h3>
             <div className="delivery-options">
-              <label className={deliveryMethod === 'pickup' ? 'delivery-option selected' : 'delivery-option'}>
-                <input
-                  type="radio"
-                  name="delivery"
-                  value="pickup"
-                  checked={deliveryMethod === 'pickup'}
-                  onChange={() => setDeliveryMethod('pickup')}
-                />
-                <span><strong>Retiro</strong><small>Retiro por el comercio.</small></span>
-              </label>
+              {(commerce?.pickupEnabled ?? true) && (
+                <label className={deliveryMethod === 'pickup' ? 'delivery-option selected' : 'delivery-option'}>
+                  <input
+                    type="radio"
+                    name="delivery"
+                    value="pickup"
+                    checked={deliveryMethod === 'pickup'}
+                    onChange={() => setDeliveryMethod('pickup')}
+                  />
+                  <span><strong>Retiro</strong><small>{commerce?.address ? `Retiro en ${commerce.address}.` : 'Retiro por el comercio.'}</small></span>
+                </label>
+              )}
 
-              <label className={deliveryMethod === 'shipping' ? 'delivery-option selected' : 'delivery-option'}>
-                <input
-                  type="radio"
-                  name="delivery"
-                  value="shipping"
-                  checked={deliveryMethod === 'shipping'}
-                  onChange={() => setDeliveryMethod('shipping')}
-                />
-                <span><strong>Envío</strong><small>Enviar a una dirección.</small></span>
-              </label>
+              {(commerce?.shippingEnabled ?? true) && (
+                <label className={deliveryMethod === 'shipping' ? 'delivery-option selected' : 'delivery-option'}>
+                  <input
+                    type="radio"
+                    name="delivery"
+                    value="shipping"
+                    checked={deliveryMethod === 'shipping'}
+                    onChange={() => setDeliveryMethod('shipping')}
+                  />
+                  <span><strong>Envío</strong><small>Enviar a una dirección.</small></span>
+                </label>
+              )}
             </div>
 
             {deliveryMethod === 'shipping' && (
