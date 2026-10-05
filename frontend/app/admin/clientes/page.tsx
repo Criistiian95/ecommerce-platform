@@ -6,14 +6,16 @@ import styles from './customers.module.css';
 
 type Customer = {
   key:string;
+  customerId?:string|null;
+  registered:boolean;
   name:string;
   email:string;
   phone:string;
   ordersCount:number;
   paidOrdersCount:number;
   totalSpent:number;
-  lastOrderAt:string;
-  lastOrderNumber:string;
+  lastOrderAt:string|null;
+  lastOrderNumber:string|null;
 };
 
 type CustomerDetail = Customer & {
@@ -31,6 +33,8 @@ type CustomerDetail = Customer & {
 
 type Summary = {
   totalCustomers:number;
+  registeredCustomers:number;
+  guestCustomers:number;
   repeatCustomers:number;
   paidRevenue:number;
   averageTicket:number;
@@ -135,7 +139,7 @@ export default function AdminCustomersPage(){
 
       <section className="summary-grid customers-summary-grid">
         <article className="card"><span className="summary-kicker">Clientes</span><strong>{summary?.totalCustomers ?? 0}</strong><span>Compradores únicos</span></article>
-        <article className="card"><span className="summary-kicker">Recurrentes</span><strong>{summary?.repeatCustomers ?? 0}</strong><span>Compraron más de una vez</span></article>
+        <article className="card"><span className="summary-kicker">Registrados</span><strong>{summary?.registeredCustomers ?? 0}</strong><span>Con cuenta en la tienda</span></article>
         <article className="card"><span className="summary-kicker">Facturación</span><strong>$ {(summary?.paidRevenue ?? 0).toLocaleString('es-AR')}</strong><span>Ventas acreditadas</span></article>
         <article className="card"><span className="summary-kicker">Ticket promedio</span><strong>$ {(summary?.averageTicket ?? 0).toLocaleString('es-AR')}</strong><span>Por compra pagada</span></article>
       </section>
@@ -173,14 +177,14 @@ export default function AdminCustomersPage(){
               >
                 <div className="customer-avatar">{customer.name?.charAt(0)?.toUpperCase() || '?'}</div>
                 <div className="customer-main">
-                  <strong>{customer.name}</strong>
+                  <div className="customer-name-line"><strong>{customer.name}</strong><span className={customer.registered?'customer-type registered':'customer-type guest'}>{customer.registered?'Registrado':'Invitado'}</span></div>
                   <span>{customer.email}</span>
                   <small>{customer.phone || 'Sin teléfono'}</small>
                 </div>
                 <div className="customer-side">
                   <strong>$ {customer.totalSpent.toLocaleString('es-AR')}</strong>
                   <span>{customer.ordersCount} pedido(s)</span>
-                  <small>Última compra {new Date(customer.lastOrderAt).toLocaleDateString('es-AR')}</small>
+                  <small>{customer.lastOrderAt?`Última compra ${new Date(customer.lastOrderAt).toLocaleDateString('es-AR')}`:'Sin compras todavía'}</small>
                 </div>
               </button>
             ))}
@@ -200,7 +204,7 @@ export default function AdminCustomersPage(){
               <div className="customer-detail-head">
                 <div className="customer-avatar large">{selected.name?.charAt(0)?.toUpperCase() || '?'}</div>
                 <div>
-                  <small>Cliente</small>
+                  <small>{selected.registered?'Cliente registrado':'Cliente invitado'}</small>
                   <h2>{selected.name}</h2>
                   <p>{selected.email}</p>
                   <p>{selected.phone}</p>
