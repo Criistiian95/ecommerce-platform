@@ -33,7 +33,7 @@ type CustomerAuthValue = {
     phone?: string | null;
     defaultAddress?: string | null;
   }) => Promise<AuthResult>;
-  logout: () => void;
+  logout: () => Promise<void>;
 };
 
 const CustomerAuthContext = createContext<CustomerAuthValue | null>(null);
@@ -150,10 +150,18 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
     }
   }
 
-  function logout() {
+  async function logout() {
+    const currentToken = token;
     localStorage.removeItem(TOKEN_KEY);
     setToken('');
     setUser(null);
+
+    if (currentToken) {
+      await fetch(`${API_URL}/auth/customer/logout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${currentToken}` },
+      }).catch(() => null);
+    }
   }
 
   const value = useMemo<CustomerAuthValue>(() => ({
