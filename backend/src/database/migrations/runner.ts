@@ -4,7 +4,7 @@ import type { Connection } from 'mysql2';
 import { baseline } from './baseline';
 
 type Query = (sql: string, values?: unknown[]) => Promise<any[]>;
-const versions = ['001_baseline', '002_legacy_checkout', '003_email_outbox', '004_customer_accounts'];
+const versions = ['001_baseline', '002_legacy_checkout', '003_email_outbox', '004_customer_accounts', '005_commerce_branding'];
 async function legacy(query: Query) {
   const columns: Record<string, Record<string, string>> = {
     products: { image_data: 'MEDIUMBLOB NULL', image_mime_type: 'VARCHAR(60) NULL', brand: 'VARCHAR(120) NULL', cost: 'DECIMAL(14,2) NULL', offer_price: 'DECIMAL(14,2) NULL', published: 'TINYINT(1) NOT NULL DEFAULT 1', featured: 'TINYINT(1) NOT NULL DEFAULT 0' },
@@ -65,7 +65,7 @@ export async function runMigrations(sequelize: Sequelize) {
         INDEX ix_email_due (status, next_attempt_at),
         FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE RESTRICT ON UPDATE CASCADE
       ) ENGINE=InnoDB`);
-      else {
+      else if (version === '004_customer_accounts') {
         const [emailIndex] = await query("SHOW INDEX FROM users WHERE Key_name = 'email'");
         if (emailIndex) await query('ALTER TABLE users DROP INDEX email');
         if (!(await query("SHOW COLUMNS FROM users WHERE Field = 'phone'")).length) {
@@ -83,6 +83,28 @@ export async function runMigrations(sequelize: Sequelize) {
         }
         if (!(await query("SHOW INDEX FROM orders WHERE Key_name = 'ix_orders_commerce_customer'")).length) {
           await query('ALTER TABLE orders ADD INDEX ix_orders_commerce_customer (commerce_id, customer_id)');
+        }
+      } else {
+        const columns: Record<string, string> = {
+          tagline: 'VARCHAR(180) NULL',
+          primary_color: "VARCHAR(20) NOT NULL DEFAULT '#245ce6'",
+          secondary_color: "VARCHAR(20) NOT NULL DEFAULT '#172238'",
+          logo_url: 'VARCHAR(500) NULL',
+          logo_data: 'MEDIUMBLOB NULL',
+          logo_mime_type: 'VARCHAR(60) NULL',
+          whatsapp: 'VARCHAR(60) NULL',
+          contact_email: 'VARCHAR(160) NULL',
+          contact_phone: 'VARCHAR(60) NULL',
+          address: 'VARCHAR(300) NULL',
+          business_hours: 'TEXT NULL',
+          pickup_enabled: 'TINYINT(1) NOT NULL DEFAULT 1',
+          shipping_enabled: 'TINYINT(1) NOT NULL DEFAULT 1',
+        };
+
+        for (const [name, type] of Object.entries(columns)) {
+          if (!(await query("SHOW COLUMNS FROM commerces WHERE Field = ?", [name])).length) {
+            await query(`ALTER TABLE commerces ADD COLUMN \`${name}\` ${type}`);
+          }
         }
       }
       // DDL is not transactional in MySQL; every step above is safe to resume.
