@@ -49,3 +49,8 @@
 :global(.status-cancelled){background:#fff0f0;color:#9d3030}
 @media(max-width:1000px){:global(.customers-summary-grid){grid-template-columns:repeat(2,minmax(0,1fr))}:global(.customers-layout){grid-template-columns:1fr}:global(.customer-detail-card){position:static}}
 @media(max-width:700px){:global(.customers-toolbar){flex-direction:column;align-items:stretch}:global(.customers-summary-grid){grid-template-columns:1fr}:global(.customer-row){grid-template-columns:auto 1fr}:global(.customer-side){grid-column:2;align-items:flex-start;text-align:left}:global(.customer-metrics){grid-template-columns:1fr}}
+
+:global(.customer-name-line){display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+:global(.customer-type){display:inline-flex;border-radius:999px;padding:3px 7px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+:global(.customer-type.registered){background:#e9f8ef;color:#27663f}
+:global(.customer-type.guest){background:#f1f3f6;color:#687386}
