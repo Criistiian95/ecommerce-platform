@@ -5,7 +5,9 @@
   "scripts": {
     "start": "node dist/main.js",
     "start:dev": "nest start --watch",
-    "build": "nest build"
+    "build": "nest build",
+    "test": "npm run build && node --test test/*.test.cjs",
+    "test:mysql": "npm run build && node --test test/mysql.integration.cjs"
   },
   "dependencies": {
     "@nestjs/common": "12.1.2",

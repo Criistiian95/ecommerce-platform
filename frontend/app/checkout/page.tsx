@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useRef, useState } from 'react';
 import { useCart } from '../cart-context';
 import { API_URL } from '../storefront-types';
 import { COMMERCE_SLUG } from '../storefront-config';
@@ -12,22 +12,20 @@ export default function CheckoutPage() {
   const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'shipping'>('pickup');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const submitting = useRef(false);
+  const [pendingOrderId, setPendingOrderId] = useState('');
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!items.length) return;
+    if (!items.length || submitting.current) return;
+    submitting.current = true;
 
     const form = new FormData(event.currentTarget);
     setSaving(true);
     setMessage('');
 
     try {
-      const response = await fetch(
-        `${API_URL}/catalog/store/${COMMERCE_SLUG}/checkout`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+      const payload = {
             customerName: form.get('customerName'),
             customerEmail: form.get('customerEmail'),
             customerPhone: form.get('customerPhone'),
@@ -38,13 +36,33 @@ export default function CheckoutPage() {
               productId: item.product.id,
               quantity: item.quantity,
             })),
-          }),
+          };
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(payload)));
+      const fingerprint = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+      const storageKey = `checkout_attempt:${COMMERCE_SLUG}`;
+      let attempt: { key: string; fingerprint: string } | null = null;
+      try { attempt = JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch {}
+      if (!attempt || attempt.fingerprint !== fingerprint) {
+        attempt = { key: crypto.randomUUID(), fingerprint };
+        localStorage.setItem(storageKey, JSON.stringify(attempt));
+      }
+      const response = await fetch(
+        `${API_URL}/catalog/store/${COMMERCE_SLUG}/checkout`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...payload, checkoutKey: attempt.key }),
         },
       );
 
       const data = await response.json().catch(() => null);
 
       if (!response.ok) {
+        if (data?.orderId) {
+          setPendingOrderId(data.orderId);
+          localStorage.setItem('last_pending_order', data.orderId);
+        }
+        if (data?.code === 'CHECKOUT_CLOSED') localStorage.removeItem(storageKey);
         setMessage(data?.message ?? 'No se pudo crear el pedido.');
         return;
       }
@@ -60,6 +78,7 @@ export default function CheckoutPage() {
     } catch {
       setMessage('No se pudo conectar con el servidor.');
     } finally {
+      submitting.current = false;
       setSaving(false);
     }
   }
@@ -83,7 +102,7 @@ export default function CheckoutPage() {
           <h1>Finalizar compra</h1>
           <p className="checkout-muted">Completá tus datos y luego te vamos a llevar a Mercado Pago.</p>
 
-          {message && <div className="cart-alert">{message}</div>}
+          {message && <div className="cart-alert">{message}{pendingOrderId && <p><Link href={`/pago/resultado?order=${encodeURIComponent(pendingOrderId)}`}>Ver estado del pedido</Link></p>}</div>}
 
           <form onSubmit={submit}>
             <div className="checkout-grid">

@@ -6,6 +6,11 @@ export type DeliveryMethod = 'pickup' | 'shipping';
 
 export class Order extends Model {
   declare id: string;
+  declare checkoutKey: string | null;
+  declare checkoutHash: string | null;
+  declare reservationExpiresAt: Date | null;
+  declare reservationCheckedAt: Date | null;
+  declare paymentReviewRequired: boolean;
   declare commerceId: string;
   declare orderNumber: string;
   declare status: OrderStatus;
@@ -30,6 +35,11 @@ export class Order extends Model {
           defaultValue: DataTypes.UUIDV4,
           primaryKey: true,
         },
+        checkoutKey: { type: DataTypes.STRING(64), allowNull: true, unique: 'uq_orders_checkout_key', field: 'checkout_key' },
+        checkoutHash: { type: DataTypes.STRING(64), allowNull: true, field: 'checkout_hash' },
+        reservationExpiresAt: { type: DataTypes.DATE, allowNull: true, field: 'reservation_expires_at' },
+        reservationCheckedAt: { type: DataTypes.DATE, allowNull: true, field: 'reservation_checked_at' },
+        paymentReviewRequired: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false, field: 'payment_review_required' },
         commerceId: {
           type: DataTypes.UUID,
           allowNull: false,

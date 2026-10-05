@@ -290,27 +290,22 @@ export class CatalogService {
       throw new BadRequestException('El ajuste debe ser un número entero distinto de cero');
     }
 
-    const product = await Product.findOne({ where: { id: productId, commerceId: cid } });
-    if (!product) throw new NotFoundException('Producto no encontrado');
-
-    const previousStock = product.currentStock;
-    const newStock = previousStock + delta;
-    if (newStock < 0) throw new BadRequestException('El stock no puede quedar negativo');
-
-    await product.update({ currentStock: newStock });
-
-    await StockMovement.create({
-      commerceId: cid,
-      productId: product.id,
-      userId,
-      type: 'adjustment',
-      previousStock,
-      quantityChange: delta,
-      newStock,
-      reason: input.reason?.trim() || null,
+    return Product.sequelize!.transaction(async transaction => {
+      const product = await Product.findOne({
+        where: { id: productId, commerceId: cid }, transaction, lock: transaction.LOCK.UPDATE,
+      });
+      if (!product) throw new NotFoundException('Producto no encontrado');
+      const previousStock = product.currentStock;
+      const newStock = previousStock + delta;
+      if (!Number.isSafeInteger(newStock) || newStock < 0 || newStock > 2147483647) {
+        throw new BadRequestException('El stock resultante es inválido');
+      }
+      await product.update({ currentStock: newStock }, { transaction });
+      await StockMovement.create({ commerceId: cid, productId: product.id, userId,
+        type: 'adjustment', previousStock, quantityChange: delta, newStock,
+        reason: input.reason?.trim() || null }, { transaction });
+      return this.sanitizeProduct(product);
     });
-
-    return product;
   }
 
   stockHistory(commerceId: string | null, productId: string) {

@@ -1,3 +1,4 @@
+import { normalizeCartItems } from './cart-items';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Op } from 'sequelize';
 import { Category } from '../database/models/category.model';
@@ -65,12 +66,7 @@ export class PublicCartService {
     items: Array<{ productId: string; quantity: number }>,
   ) {
     const commerceId = await this.commerceId(slug);
-    const cleanItems = items
-      .filter(item => item?.productId && Number.isInteger(Number(item.quantity)))
-      .map(item => ({
-        productId: item.productId,
-        quantity: Math.max(1, Number(item.quantity)),
-      }));
+    const cleanItems = normalizeCartItems(items);
 
     if (!cleanItems.length) return { valid: true, items: [] };
 
