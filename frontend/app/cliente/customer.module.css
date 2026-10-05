@@ -1,7 +1,7 @@
 .root{min-height:100vh;background:#f5f7fb;color:#182033;padding:28px}
 .shell{max-width:720px;margin:0 auto}
 .accountShell{max-width:1180px;margin:0 auto}
-.back{display:inline-block;margin-bottom:18px;color:#355e9d;text-decoration:none;font-weight:700;font-size:13px}
+.back{display:inline-flex;align-items:center;color:#355e9d;text-decoration:none;font-weight:700;font-size:13px}.accountTopRow{margin-bottom:18px}
 .authCard,.panel,.loadingCard{background:#fff;border:1px solid #e2e8f0;border-radius:18px;box-shadow:0 8px 26px rgba(15,23,42,.04)}
 .authCard{padding:32px}
 .authCard h1,.accountHeader h1{margin:6px 0 8px;font-size:34px;letter-spacing:-.03em}
@@ -18,7 +18,7 @@
 .success{background:#eaf8ef;color:#23613d}
 .authFooter{display:flex;gap:8px;justify-content:center;margin-top:22px;padding-top:18px;border-top:1px solid #e8edf4;font-size:13px}
 .authFooter a{font-weight:800;color:#355e9d}
-.accountHeader{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:22px}
+.accountHeader{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:22px}.accountHeader .eyebrow{display:block;margin-bottom:8px}
 .accountGrid{display:grid;grid-template-columns:minmax(320px,.75fr) minmax(0,1.25fr);gap:22px}
 .panel{padding:24px}
 .panel h2{margin-top:0}
