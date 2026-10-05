@@ -8,6 +8,7 @@ import { DatabaseService } from '../database/database.service';
 import { User } from '../database/models/user.model';
 import { Session } from '../database/models/session.model';
 import { Commerce } from '../database/models/commerce.model';
+import { Order } from '../database/models/order.model';
 
 @Injectable()
 export class AuthService {
