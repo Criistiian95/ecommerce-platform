@@ -32,7 +32,7 @@ export default function LoginPage() {
     localStorage.setItem('ecommerce_token', data.token);
 
     if (data.user.role === 'admin' || data.user.role === 'superadmin') {
-      router.push('/admin');
+      router.push('/admin/dashboard');
       return;
     }
 
