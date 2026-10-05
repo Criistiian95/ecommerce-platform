@@ -83,3 +83,7 @@
 :global(.payment-result-icon.pending){background:#fff4e5;color:#9a5a0a}
 :global(.payment-result-actions){display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:24px}
 :global(.payment-confirmation-note){margin-top:20px}
+
+:global(.checkout-account-prompt){margin:14px 0 18px;padding:12px 14px;border:1px solid #d9e3f2;border-radius:11px;background:#f6f9ff;color:#52627a;font-size:13px}
+:global(.checkout-account-prompt a){color:#2857a7;font-weight:800}
+:global(.checkout-card input[readonly]){background:#f5f7fa;color:#596579}
