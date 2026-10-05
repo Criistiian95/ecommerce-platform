@@ -300,7 +300,10 @@ export default function AdminPage() {
           <div className="brand">Panel del comercio</div>
           <small>Productos, categorías y stock</small>
         </div>
-        <a className="btn secondary" href="/">Ver tienda</a>
+        <div className="admin-nav-actions">
+          <a className="btn secondary" href="/admin/pedidos">Pedidos</a>
+          <a className="btn secondary" href="/">Ver tienda</a>
+        </div>
       </header>
 
       {toast && (
