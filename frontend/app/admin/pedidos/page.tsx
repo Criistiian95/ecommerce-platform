@@ -166,6 +166,7 @@ export default function AdminOrdersPage() {
         </div>
         <div className="admin-nav-actions">
           <Link className="btn secondary" href="/admin">Productos</Link>
+          <Link className="btn secondary" href="/admin/clientes">Clientes</Link>
           <Link className="btn secondary" href="/">Ver tienda</Link>
         </div>
       </header>
