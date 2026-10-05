@@ -3,12 +3,14 @@
 import Link from 'next/link';
 import { FormEvent, useRef, useState } from 'react';
 import { useCart } from '../cart-context';
+import { useCustomerAuth } from '../customer-auth-context';
 import { API_URL } from '../storefront-types';
 import { COMMERCE_SLUG } from '../storefront-config';
 import '../tienda/store.module.css';
 
 export default function CheckoutPage() {
   const { items, subtotal } = useCart();
+  const { user, token } = useCustomerAuth();
   const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'shipping'>('pickup');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -50,7 +52,10 @@ export default function CheckoutPage() {
         `${API_URL}/catalog/store/${COMMERCE_SLUG}/checkout`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify({ ...payload, checkoutKey: attempt.key }),
         },
       );
@@ -100,23 +105,24 @@ export default function CheckoutPage() {
       <div className="checkout-layout">
         <section className="checkout-card">
           <h1>Finalizar compra</h1>
-          <p className="checkout-muted">Completá tus datos y luego te vamos a llevar a Mercado Pago.</p>
+          <p className="checkout-muted">{user?'Revisá tus datos y luego te vamos a llevar a Mercado Pago.':'Completá tus datos y luego te vamos a llevar a Mercado Pago.'}</p>
+          {!user && <div className="checkout-account-prompt">¿Ya tenés cuenta? <Link href="/cliente/login?next=/checkout">Ingresá</Link> o <Link href="/cliente/registro?next=/checkout">registrate</Link> para guardar tus compras.</div>}
 
           {message && <div className="cart-alert">{message}{pendingOrderId && <p><Link href={`/pago/resultado?order=${encodeURIComponent(pendingOrderId)}`}>Ver estado del pedido</Link></p>}</div>}
 
-          <form onSubmit={submit}>
+          <form onSubmit={submit} key={user?.id ?? 'guest'}>
             <div className="checkout-grid">
               <label className="field">
                 Nombre y apellido
-                <input name="customerName" autoComplete="name" required />
+                <input name="customerName" autoComplete="name" defaultValue={user?.name ?? ''} readOnly={Boolean(user)} required />
               </label>
               <label className="field">
                 Teléfono
-                <input name="customerPhone" type="tel" autoComplete="tel" required />
+                <input name="customerPhone" type="tel" autoComplete="tel" defaultValue={user?.phone ?? ''} required />
               </label>
               <label className="field full-field">
                 Email
-                <input name="customerEmail" type="email" autoComplete="email" required />
+                <input name="customerEmail" type="email" autoComplete="email" defaultValue={user?.email ?? ''} readOnly={Boolean(user)} required />
               </label>
             </div>
 
@@ -148,7 +154,7 @@ export default function CheckoutPage() {
             {deliveryMethod === 'shipping' && (
               <label className="field">
                 Dirección
-                <input name="address" autoComplete="street-address" required placeholder="Calle, número, localidad" />
+                <input name="address" autoComplete="street-address" defaultValue={user?.defaultAddress ?? ''} required placeholder="Calle, número, localidad" />
               </label>
             )}
 
