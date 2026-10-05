@@ -5,6 +5,7 @@ import { PublicCatalogService } from './public-catalog.service';
 import { PublicCartService } from './public-cart.service';
 import { PublicCheckoutService } from './public-checkout.service';
 import { MercadoPagoService } from './mercado-pago.service';
+import { AuthService } from '../auth/auth.service';
 
 @Controller('catalog')
 export class CatalogPublicController {
@@ -14,6 +15,7 @@ export class CatalogPublicController {
     private readonly publicCart: PublicCartService,
     private readonly publicCheckout: PublicCheckoutService,
     private readonly mercadoPago: MercadoPagoService,
+    private readonly authService: AuthService,
   ) {}
 
   @Get('store/:slug')
@@ -35,8 +37,9 @@ export class CatalogPublicController {
   }
 
   @Post('store/:slug/checkout')
-  checkout(
+  async checkout(
     @Param('slug') slug: string,
+    @Headers('authorization') authorization: string | undefined,
     @Body()
     body: {
       checkoutKey: string;
@@ -49,10 +52,19 @@ export class CatalogPublicController {
       items?: Array<{ productId: string; quantity: number }>;
     },
   ) {
-    return this.publicCheckout.createOrder(slug, {
-      ...body,
-      items: body.items ?? [],
-    });
+    const customer = await this.authService.resolveCustomerAuthorization(
+      authorization,
+      slug,
+    );
+
+    return this.publicCheckout.createOrder(
+      slug,
+      {
+        ...body,
+        items: body.items ?? [],
+      },
+      customer?.id ?? null,
+    );
   }
 
 
