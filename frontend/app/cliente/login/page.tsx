@@ -2,14 +2,13 @@
 
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useCustomerAuth } from '../../customer-auth-context';
 import styles from '../customer.module.css';
 
 export default function CustomerLoginPage() {
   const { login } = useCustomerAuth();
   const router = useRouter();
-  const params = useSearchParams();
   const [message,setMessage] = useState('');
   const [saving,setSaving] = useState(false);
 
@@ -31,7 +30,7 @@ export default function CustomerLoginPage() {
       return;
     }
 
-    const next = params.get('next');
+    const next = new URLSearchParams(window.location.search).get('next');
     router.push(next && next.startsWith('/') ? next : '/mi-cuenta');
   }
 
