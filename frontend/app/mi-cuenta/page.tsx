@@ -83,14 +83,16 @@ export default function CustomerAccountPage(){
   return (
     <main className={styles.root}>
       <div className={styles.accountShell}>
+        <div className={styles.accountTopRow}>
+          <Link href="/tienda" className={styles.back}>← Volver a la tienda</Link>
+        </div>
         <header className={styles.accountHeader}>
           <div>
-            <Link href="/tienda" className={styles.back}>← Volver a la tienda</Link>
             <span className={styles.eyebrow}>MI CUENTA</span>
             <h1>Hola, {user.name.split(' ')[0]}</h1>
             <p>Administrá tus datos y consultá tus compras.</p>
           </div>
-          <button className="btn secondary" onClick={()=>{logout();router.push('/tienda');}}>Cerrar sesión</button>
+          <button className="btn secondary" onClick={()=>{void logout();router.push('/tienda');}}>Cerrar sesión</button>
         </header>
 
         {message && <div className={message.includes('correctamente')?styles.success:styles.alert}>{message}</div>}
