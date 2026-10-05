@@ -168,6 +168,7 @@ export class AdminOrdersService {
 
       await lockedOrder.update({
         status: 'cancelled',
+        paymentReviewRequired: lockedOrder.paymentStatus === 'paid',
         ...(lockedOrder.paymentStatus === 'pending' ? { paymentStatus: 'cancelled' } : {}),
       }, { transaction });
 
