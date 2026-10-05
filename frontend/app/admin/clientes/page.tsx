@@ -123,6 +123,7 @@ export default function AdminCustomersPage(){
           <small>Clientes e historial de compras</small>
         </div>
         <div className="admin-nav-actions">
+          <Link className="btn secondary" href="/admin/dashboard">Dashboard</Link>
           <Link className="btn secondary" href="/admin">Productos</Link>
           <Link className="btn secondary" href="/admin/pedidos">Pedidos</Link>
           <Link className="btn secondary" href="/">Ver tienda</Link>
