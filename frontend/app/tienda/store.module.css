@@ -87,3 +87,8 @@
 :global(.checkout-account-prompt){margin:14px 0 18px;padding:12px 14px;border:1px solid #d9e3f2;border-radius:11px;background:#f6f9ff;color:#52627a;font-size:13px}
 :global(.checkout-account-prompt a){color:#2857a7;font-weight:800}
 :global(.checkout-card input[readonly]){background:#f5f7fa;color:#596579}
+
+:global(.commerce-theme){color:var(--ink)}
+:global(.store-logo){width:43px;height:43px;border-radius:12px;object-fit:contain;background:#fff;border:1px solid var(--line);padding:3px}
+:global(.store-hours){display:block;white-space:pre-line;margin-top:6px;color:var(--muted);max-width:320px}
+@media(max-width:640px){:global(.store-logo){width:35px;height:35px;border-radius:10px}}
