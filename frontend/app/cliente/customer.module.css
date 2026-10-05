@@ -1,0 +1,37 @@
+.root{min-height:100vh;background:#f5f7fb;color:#182033;padding:28px}
+.shell{max-width:720px;margin:0 auto}
+.accountShell{max-width:1180px;margin:0 auto}
+.back{display:inline-block;margin-bottom:18px;color:#355e9d;text-decoration:none;font-weight:700;font-size:13px}
+.authCard,.panel,.loadingCard{background:#fff;border:1px solid #e2e8f0;border-radius:18px;box-shadow:0 8px 26px rgba(15,23,42,.04)}
+.authCard{padding:32px}
+.authCard h1,.accountHeader h1{margin:6px 0 8px;font-size:34px;letter-spacing:-.03em}
+.authCard>p,.accountHeader p{color:#6b7280;margin-top:0}
+.eyebrow{font-size:11px;font-weight:800;letter-spacing:.11em;color:#5f78a6}
+.form{display:flex;flex-direction:column;gap:15px;margin-top:24px}
+.form label{display:flex;flex-direction:column;gap:7px;font-weight:650;font-size:13px}
+.form input{border:1px solid #d8e0eb;border-radius:10px;padding:12px 13px;background:#fff;font:inherit}
+.form input:disabled{background:#f2f4f7;color:#667085}
+.twoCols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.help{color:#7b8495;margin-top:-8px}
+.alert,.success{margin:16px 0;padding:12px 14px;border-radius:11px;font-size:13px}
+.alert{background:#fff3e8;color:#8a4f08}
+.success{background:#eaf8ef;color:#23613d}
+.authFooter{display:flex;gap:8px;justify-content:center;margin-top:22px;padding-top:18px;border-top:1px solid #e8edf4;font-size:13px}
+.authFooter a{font-weight:800;color:#355e9d}
+.accountHeader{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:22px}
+.accountGrid{display:grid;grid-template-columns:minmax(320px,.75fr) minmax(0,1.25fr);gap:22px}
+.panel{padding:24px}
+.panel h2{margin-top:0}
+.panelHead{display:flex;justify-content:space-between;align-items:flex-start}
+.panelHead strong{font-size:24px}
+.orderList{display:flex;flex-direction:column;gap:11px;margin-top:14px}
+.orderCard{border:1px solid #e2e8f0;border-radius:13px;padding:14px}
+.orderTop{display:flex;justify-content:space-between;gap:14px}
+.orderTop>div{display:flex;flex-direction:column;gap:3px}
+.orderTop small{color:#7b8495}
+.orderMeta{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+.orderMeta span{background:#f1f5fb;border-radius:999px;padding:5px 9px;font-size:11px;color:#51627c;font-weight:700}
+.empty{padding:28px;text-align:center;color:#6b7280}
+.empty h3{color:#182033}
+.loadingCard{padding:28px;text-align:center}
+@media(max-width:800px){.root{padding:18px}.accountGrid{grid-template-columns:1fr}.accountHeader{align-items:flex-start;flex-direction:column}.twoCols{grid-template-columns:1fr}.authCard{padding:24px}}
