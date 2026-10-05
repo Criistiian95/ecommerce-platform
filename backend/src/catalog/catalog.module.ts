@@ -7,6 +7,7 @@ import { CatalogPublicController } from './catalog-public.controller';
 import { AdminOrdersController } from './admin-orders.controller';
 import { AdminCustomersController } from './admin-customers.controller';
 import { CustomerAccountController } from './customer-account.controller';
+import { AdminDashboardController } from './admin-dashboard.controller';
 import { CatalogService } from './catalog.service';
 import { PublicCatalogService } from './public-catalog.service';
 import { PublicCartService } from './public-cart.service';
@@ -16,12 +17,13 @@ import { MercadoPagoService } from './mercado-pago.service';
 import { AdminOrdersService } from './admin-orders.service';
 import { AdminCustomersService } from './admin-customers.service';
 import { CustomerAccountService } from './customer-account.service';
+import { AdminDashboardService } from './admin-dashboard.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 
 @Module({
   imports: [AuthModule],
-  controllers: [CatalogController, CatalogPublicController, AdminOrdersController, AdminCustomersController, CustomerAccountController],
-  providers: [OrderEmailWorker, ReservationWorker, CatalogService, PublicCatalogService, PublicCartService, PublicCheckoutService, OrderEmailService, MercadoPagoService, AdminOrdersService, AdminCustomersService, CustomerAccountService, AuthGuard, RolesGuard],
+  controllers: [CatalogController, CatalogPublicController, AdminOrdersController, AdminCustomersController, CustomerAccountController, AdminDashboardController],
+  providers: [OrderEmailWorker, ReservationWorker, CatalogService, PublicCatalogService, PublicCartService, PublicCheckoutService, OrderEmailService, MercadoPagoService, AdminOrdersService, AdminCustomersService, CustomerAccountService, AdminDashboardService, AuthGuard, RolesGuard],
 })
 export class CatalogModule {}
