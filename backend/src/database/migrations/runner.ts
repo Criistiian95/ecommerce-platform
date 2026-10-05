@@ -4,7 +4,7 @@ import type { Connection } from 'mysql2';
 import { baseline } from './baseline';
 
 type Query = (sql: string, values?: unknown[]) => Promise<any[]>;
-const versions = ['001_baseline', '002_legacy_checkout', '003_email_outbox'];
+const versions = ['001_baseline', '002_legacy_checkout', '003_email_outbox', '004_customer_accounts'];
 async function legacy(query: Query) {
   const columns: Record<string, Record<string, string>> = {
     products: { image_data: 'MEDIUMBLOB NULL', image_mime_type: 'VARCHAR(60) NULL', brand: 'VARCHAR(120) NULL', cost: 'DECIMAL(14,2) NULL', offer_price: 'DECIMAL(14,2) NULL', published: 'TINYINT(1) NOT NULL DEFAULT 1', featured: 'TINYINT(1) NOT NULL DEFAULT 0' },
@@ -55,7 +55,7 @@ export async function runMigrations(sequelize: Sequelize) {
           }
         }
       } else if (version === '002_legacy_checkout') await legacy(query);
-      else await query(`CREATE TABLE IF NOT EXISTS order_email_deliveries (
+      else if (version === '003_email_outbox') await query(`CREATE TABLE IF NOT EXISTS order_email_deliveries (
         id CHAR(36) BINARY PRIMARY KEY, order_id CHAR(36) BINARY NOT NULL UNIQUE,
         status VARCHAR(20) NOT NULL DEFAULT 'pending', payload JSON NOT NULL, message MEDIUMTEXT NULL,
         attempts INT NOT NULL DEFAULT 0, first_attempt_at DATETIME NULL, next_attempt_at DATETIME NOT NULL,
@@ -65,6 +65,26 @@ export async function runMigrations(sequelize: Sequelize) {
         INDEX ix_email_due (status, next_attempt_at),
         FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE RESTRICT ON UPDATE CASCADE
       ) ENGINE=InnoDB`);
+      else {
+        const [emailIndex] = await query("SHOW INDEX FROM users WHERE Key_name = 'email'");
+        if (emailIndex) await query('ALTER TABLE users DROP INDEX email');
+        if (!(await query("SHOW COLUMNS FROM users WHERE Field = 'phone'")).length) {
+          await query('ALTER TABLE users ADD COLUMN phone VARCHAR(60) NULL AFTER name');
+        }
+        if (!(await query("SHOW COLUMNS FROM users WHERE Field = 'default_address'")).length) {
+          await query('ALTER TABLE users ADD COLUMN default_address VARCHAR(300) NULL AFTER phone');
+        }
+        if (!(await query("SHOW INDEX FROM users WHERE Key_name = 'uq_users_commerce_email'")).length) {
+          await query('ALTER TABLE users ADD UNIQUE INDEX uq_users_commerce_email (commerce_id, email)');
+        }
+        if (!(await query("SHOW COLUMNS FROM orders WHERE Field = 'customer_id'")).length) {
+          await query('ALTER TABLE orders ADD COLUMN customer_id CHAR(36) BINARY NULL AFTER commerce_id');
+          await query('ALTER TABLE orders ADD CONSTRAINT fk_orders_customer FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE');
+        }
+        if (!(await query("SHOW INDEX FROM orders WHERE Key_name = 'ix_orders_commerce_customer'")).length) {
+          await query('ALTER TABLE orders ADD INDEX ix_orders_commerce_customer (commerce_id, customer_id)');
+        }
+      }
       // DDL is not transactional in MySQL; every step above is safe to resume.
       await query('INSERT INTO schema_migrations (version, applied_at) VALUES (?, NOW())', [version]);
     }
