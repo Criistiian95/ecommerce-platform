@@ -23,6 +23,14 @@ export class CatalogPublicController {
     return this.publicCatalog.getCatalog(slug);
   }
 
+  @Get('store/:slug/logo')
+  async commerceLogo(@Param('slug') slug: string, @Res() res: Response) {
+    const logo = await this.publicCatalog.getCommerceLogo(slug);
+    res.setHeader('Content-Type', logo.mimeType);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(logo.data);
+  }
+
   @Get('store/:slug/products/:id')
   productDetail(@Param('slug') slug: string, @Param('id') id: string) {
     return this.publicCart.getProduct(slug, id);
