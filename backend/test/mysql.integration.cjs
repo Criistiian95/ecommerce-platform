@@ -134,7 +134,7 @@ test('MySQL: two email workers claim one message; retry keeps the exact body and
 test('MySQL: abandoned send lease is recovered; expired idempotency window requires review', async () => {
   const f = await paidFixture(); configured();
   await f.delivery.update({ status: 'sending', leaseUntil: new Date(0), leaseToken: 'old', attempts: 1,
-    firstAttemptAt: new Date(), message: f.email.buildMessage(f.delivery.payload, process.env.ORDER_EMAIL_FROM) });
+    firstAttemptAt: new Date(), message: JSON.stringify(f.email.buildMessage(f.delivery.payload, process.env.ORDER_EMAIL_FROM)) });
   const send = mock.method(f.email, 'sendMessage', async () => ({ id: 'recovered', retryable: false }));
   await new OrderEmailWorker(f.email).run(); assert.equal(send.mock.callCount(), 1); assert.equal((await f.delivery.reload()).status, 'sent');
   const old = await paidFixture(); await old.delivery.update({ firstAttemptAt: new Date(Date.now() - 21 * 3600000), attempts: 1 });

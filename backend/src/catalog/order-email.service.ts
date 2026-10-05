@@ -119,12 +119,12 @@ export class OrderEmailService {
       html, text, tags: [{ name: 'category', value: 'order_confirmation' }] };
   }
 
-  async sendMessage(message: Record<string, any>, key: string): Promise<{ id?: string; retryable: boolean; error?: string }> {
+  async sendMessage(message: string, key: string): Promise<{ id?: string; retryable: boolean; error?: string }> {
     try {
       const response = await fetch('https://api.resend.com/emails', {
         method: 'POST', signal: AbortSignal.timeout(15000),
         headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': key },
-        body: JSON.stringify(message),
+        body: message,
       });
       const body = await response.json().catch(() => null) as { id?: string; name?: string } | null;
       if (response.ok && body?.id) return { id: body.id, retryable: false };

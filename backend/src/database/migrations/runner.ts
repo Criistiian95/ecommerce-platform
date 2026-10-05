@@ -57,7 +57,7 @@ export async function runMigrations(sequelize: Sequelize) {
       } else if (version === '002_legacy_checkout') await legacy(query);
       else await query(`CREATE TABLE IF NOT EXISTS order_email_deliveries (
         id CHAR(36) BINARY PRIMARY KEY, order_id CHAR(36) BINARY NOT NULL UNIQUE,
-        status VARCHAR(20) NOT NULL DEFAULT 'pending', payload JSON NOT NULL, message JSON NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending', payload JSON NOT NULL, message MEDIUMTEXT NULL,
         attempts INT NOT NULL DEFAULT 0, first_attempt_at DATETIME NULL, next_attempt_at DATETIME NOT NULL,
         lease_until DATETIME NULL, lease_token CHAR(36) NULL, sent_at DATETIME NULL,
         provider_message_id VARCHAR(150) NULL, last_error VARCHAR(100) NULL,

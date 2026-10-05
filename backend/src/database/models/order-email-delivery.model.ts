@@ -4,7 +4,7 @@ export class OrderEmailDelivery extends Model {
   declare orderId: string;
   declare status: 'pending' | 'sending' | 'sent' | 'failed';
   declare payload: Record<string, any>;
-  declare message: Record<string, any> | null;
+  declare message: string | null;
   declare attempts: number;
   declare firstAttemptAt: Date | null;
   declare nextAttemptAt: Date;
@@ -18,7 +18,7 @@ export class OrderEmailDelivery extends Model {
       id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
       orderId: { type: DataTypes.UUID, allowNull: false, unique: true, field: 'order_id' },
       status: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'pending' },
-      payload: { type: DataTypes.JSON, allowNull: false }, message: { type: DataTypes.JSON, allowNull: true },
+      payload: { type: DataTypes.JSON, allowNull: false }, message: { type: DataTypes.TEXT('medium'), allowNull: true },
       attempts: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
       firstAttemptAt: { type: DataTypes.DATE, field: 'first_attempt_at' },
       nextAttemptAt: { type: DataTypes.DATE, allowNull: false, field: 'next_attempt_at' },
