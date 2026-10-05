@@ -66,6 +66,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
     Commerce.hasMany(Order, { foreignKey: 'commerceId', as: 'orders' });
     Order.belongsTo(Commerce, { foreignKey: 'commerceId', as: 'commerce' });
+    User.hasMany(Order, { foreignKey: 'customerId', as: 'customerOrders' });
+    Order.belongsTo(User, { foreignKey: 'customerId', as: 'customer' });
 
     Order.hasMany(OrderItem, { foreignKey: 'orderId', as: 'items' });
     OrderItem.belongsTo(Order, { foreignKey: 'orderId', as: 'order' });
