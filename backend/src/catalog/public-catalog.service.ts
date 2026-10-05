@@ -8,7 +8,12 @@ export class PublicCatalogService {
   async getCatalog(commerceSlug: string) {
     const commerce = await Commerce.findOne({
       where: { slug: commerceSlug, active: true },
-      attributes: ['id', 'name', 'slug'],
+      attributes: [
+        'id','name','slug','tagline','primaryColor','secondaryColor',
+        'logoUrl','logoMimeType','whatsapp','contactEmail','contactPhone',
+        'address','businessHours','pickupEnabled','shippingEnabled',
+        [Commerce.sequelize!.literal('(logo_data IS NOT NULL)'), 'hasUploadedLogo'],
+      ],
     });
 
     if (!commerce) {
@@ -72,9 +77,37 @@ export class PublicCatalogService {
       commerce: {
         name: commerce.name,
         slug: commerce.slug,
+        tagline: commerce.tagline,
+        primaryColor: commerce.primaryColor,
+        secondaryColor: commerce.secondaryColor,
+        logoUrl: commerce.logoUrl,
+        hasUploadedLogo: Boolean((commerce.get({ plain: true }) as any).hasUploadedLogo),
+        whatsapp: commerce.whatsapp,
+        contactEmail: commerce.contactEmail,
+        contactPhone: commerce.contactPhone,
+        address: commerce.address,
+        businessHours: commerce.businessHours,
+        pickupEnabled: Boolean(commerce.pickupEnabled),
+        shippingEnabled: Boolean(commerce.shippingEnabled),
       },
       categories: [...categoryMap.values()].sort((a, b) => a.name.localeCompare(b.name)),
       products: publicProducts,
+    };
+  }
+
+  async getCommerceLogo(commerceSlug: string) {
+    const commerce = await Commerce.findOne({
+      where: { slug: commerceSlug, active: true },
+      attributes: ['logoData', 'logoMimeType'],
+    });
+
+    if (!commerce?.logoData || !commerce.logoMimeType) {
+      throw new NotFoundException('Logo no encontrado');
+    }
+
+    return {
+      data: commerce.logoData,
+      mimeType: commerce.logoMimeType,
     };
   }
 }
