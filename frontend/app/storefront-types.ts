@@ -21,6 +21,18 @@ export type StoreCatalog = {
   commerce: {
     name: string;
     slug: string;
+    tagline?: string | null;
+    primaryColor: string;
+    secondaryColor: string;
+    logoUrl?: string | null;
+    hasUploadedLogo?: boolean;
+    whatsapp?: string | null;
+    contactEmail?: string | null;
+    contactPhone?: string | null;
+    address?: string | null;
+    businessHours?: string | null;
+    pickupEnabled: boolean;
+    shippingEnabled: boolean;
   };
   categories: StoreCategory[];
   products: StoreProduct[];
