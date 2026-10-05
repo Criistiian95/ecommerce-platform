@@ -55,6 +55,13 @@ export class AuthController {
     );
   }
 
+  @Post('customer/logout')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('customer')
+  customerLogout(@Req() req: AuthenticatedRequest) {
+    return this.auth.logout(req.auth!.sessionId);
+  }
+
   @Get('customer/me')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('customer')
