@@ -302,6 +302,7 @@ export default function AdminPage() {
         </div>
         <div className="admin-nav-actions">
           <a className="btn secondary" href="/admin/pedidos">Pedidos</a>
+          <a className="btn secondary" href="/admin/clientes">Clientes</a>
           <a className="btn secondary" href="/">Ver tienda</a>
         </div>
       </header>
