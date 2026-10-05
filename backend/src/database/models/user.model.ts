@@ -8,6 +8,8 @@ export class User extends Model {
   declare email: string;
   declare passwordHash: string;
   declare name: string;
+  declare phone: string | null;
+  declare defaultAddress: string | null;
   declare role: UserRole;
   declare active: boolean;
 
@@ -27,7 +29,6 @@ export class User extends Model {
         email: {
           type: DataTypes.STRING(190),
           allowNull: false,
-          unique: true,
         },
         passwordHash: {
           type: DataTypes.STRING(100),
@@ -37,6 +38,15 @@ export class User extends Model {
         name: {
           type: DataTypes.STRING(120),
           allowNull: false,
+        },
+        phone: {
+          type: DataTypes.STRING(60),
+          allowNull: true,
+        },
+        defaultAddress: {
+          type: DataTypes.STRING(300),
+          allowNull: true,
+          field: 'default_address',
         },
         role: {
           type: DataTypes.ENUM('superadmin', 'admin', 'operator', 'customer'),
@@ -53,6 +63,13 @@ export class User extends Model {
         modelName: 'User',
         tableName: 'users',
         underscored: true,
+        indexes: [
+          {
+            unique: true,
+            fields: ['commerce_id', 'email'],
+            name: 'uq_users_commerce_email',
+          },
+        ],
       },
     );
   }
