@@ -10,6 +10,8 @@ async function bootstrap() {
     bodyParser: false,
   });
 
+  app.enableShutdownHooks();
+
   app.use(json({ limit: '4mb' }));
   app.use(urlencoded({ extended: true, limit: '4mb' }));
 

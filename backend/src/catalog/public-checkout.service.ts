@@ -1,5 +1,7 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { normalizeCartItems } from './cart-items';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { createHash, randomUUID } from 'crypto';
+import { UniqueConstraintError } from 'sequelize';
 import { Commerce } from '../database/models/commerce.model';
 import { Order } from '../database/models/order.model';
 import { OrderItem } from '../database/models/order-item.model';
@@ -8,6 +10,7 @@ import { StockMovement } from '../database/models/stock-movement.model';
 import { MercadoPagoService } from './mercado-pago.service';
 
 type CheckoutInput = {
+  checkoutKey: string;
   customerName: string;
   customerEmail: string;
   customerPhone: string;
@@ -21,6 +24,14 @@ type CheckoutInput = {
 export class PublicCheckoutService {
   constructor(private readonly mercadoPago: MercadoPagoService) {}
   private validateCustomer(input: CheckoutInput) {
+    if (typeof input.checkoutKey !== 'string' || !/^[a-zA-Z0-9-]{20,100}$/.test(input.checkoutKey)) {
+      throw new BadRequestException('Clave de checkout inválida');
+    }
+    if ([input.customerName, input.customerEmail, input.customerPhone].some(value => typeof value !== 'string') ||
+        (input.address != null && typeof input.address !== 'string') ||
+        (input.notes != null && typeof input.notes !== 'string')) {
+      throw new BadRequestException('Datos del cliente inválidos');
+    }
     const name = input.customerName?.trim();
     const email = input.customerEmail?.trim().toLowerCase();
     const phone = input.customerPhone?.trim();
@@ -42,6 +53,21 @@ export class PublicCheckoutService {
     }
   }
 
+  private replay(order: Order, hash: string) {
+    if (order.checkoutHash !== hash) throw new ConflictException('La clave de checkout ya se usó con otros datos');
+    if (order.paymentStatus !== 'pending' || order.status !== 'pending_payment') {
+      throw new ConflictException({ message: 'Este pedido ya finalizó. Revisá su estado.', code: 'CHECKOUT_CLOSED', orderId: order.id });
+    }
+    if (order.reservationExpiresAt && order.reservationExpiresAt <= new Date()) {
+      throw new ConflictException({ message: 'La reserva está vencida y pendiente de conciliación. Revisá el estado del pedido.', orderId: order.id });
+    }
+    if (!order.mpCheckoutUrl) throw new ConflictException({ message: 'El pago se está preparando o verificando. Reintentá en unos momentos.', orderId: order.id });
+    return { ok: true, order: { id: order.id, orderNumber: order.orderNumber,
+      status: order.status, paymentStatus: order.paymentStatus, subtotal: Number(order.subtotal),
+      total: Number(order.total), deliveryMethod: order.deliveryMethod },
+      payment: { mpOrderId: order.mpOrderId, checkoutUrl: order.mpCheckoutUrl } };
+  }
+
   async createOrder(slug: string, input: CheckoutInput) {
     this.validateCustomer(input);
 
@@ -54,21 +80,44 @@ export class PublicCheckoutService {
       throw new NotFoundException('Comercio no encontrado');
     }
 
-    const cleanItems = (input.items ?? [])
-      .filter(item => item?.productId && Number.isInteger(Number(item.quantity)))
-      .map(item => ({
-        productId: item.productId,
-        quantity: Math.max(1, Number(item.quantity)),
-      }));
+    const cleanItems = normalizeCartItems(input.items);
 
     if (!cleanItems.length) {
       throw new BadRequestException('El carrito está vacío');
     }
 
+    const checkoutKey = createHash('sha256').update(`${commerce.id}:${input.checkoutKey}`).digest('hex');
+    const checkoutHash = createHash('sha256').update(JSON.stringify({
+      customerName: input.customerName.trim(), customerEmail: input.customerEmail.trim().toLowerCase(),
+      customerPhone: input.customerPhone.trim(), deliveryMethod: input.deliveryMethod,
+      address: input.deliveryMethod === 'shipping' ? input.address?.trim() || null : null,
+      notes: input.notes?.trim() || null, items: cleanItems,
+    })).digest('hex');
+    const existing = await Order.findOne({ where: { checkoutKey } });
+    if (existing) return this.replay(existing, checkoutHash);
     const transaction = await Product.sequelize!.transaction();
     let committed = false;
 
     try {
+      const orderNumber = `ORD-${Date.now()}-${randomUUID().slice(0, 6).toUpperCase()}`;
+
+      const order = await Order.create({
+        commerceId: commerce.id,
+        checkoutKey, checkoutHash,
+        reservationExpiresAt: new Date(Date.now() + 30 * 60 * 1000),
+        reservationCheckedAt: new Date(),
+        orderNumber,
+        status: 'pending_payment',
+        paymentStatus: 'pending',
+        customerName: input.customerName.trim(),
+        customerEmail: input.customerEmail.trim().toLowerCase(),
+        customerPhone: input.customerPhone.trim(),
+        deliveryMethod: input.deliveryMethod,
+        address: input.deliveryMethod === 'shipping' ? input.address?.trim() || null : null,
+        notes: input.notes?.trim() || null,
+        subtotal: 0,
+        total: 0,
+      }, { transaction });
       const orderLines: Array<{
         product: Product;
         quantity: number;
@@ -106,22 +155,7 @@ export class PublicCheckoutService {
       }
 
       const subtotal = orderLines.reduce((sum, line) => sum + line.lineTotal, 0);
-      const orderNumber = `ORD-${Date.now()}-${randomUUID().slice(0, 6).toUpperCase()}`;
-
-      const order = await Order.create({
-        commerceId: commerce.id,
-        orderNumber,
-        status: 'pending_payment',
-        paymentStatus: 'pending',
-        customerName: input.customerName.trim(),
-        customerEmail: input.customerEmail.trim().toLowerCase(),
-        customerPhone: input.customerPhone.trim(),
-        deliveryMethod: input.deliveryMethod,
-        address: input.deliveryMethod === 'shipping' ? input.address?.trim() || null : null,
-        notes: input.notes?.trim() || null,
-        subtotal,
-        total: subtotal,
-      }, { transaction });
+      await order.update({ subtotal, total: subtotal }, { transaction });
 
       for (const line of orderLines) {
         await OrderItem.create({
@@ -181,13 +215,19 @@ export class PublicCheckoutService {
         };
       } catch (error) {
         console.error('Mercado Pago checkout creation failed', error);
-        await this.mercadoPago.releaseReservation(order, 'cancelled');
-        throw new BadRequestException(
-          'No se pudo iniciar el pago. El stock reservado fue liberado.',
-        );
+        // A timeout may mean MP created the preference. Keep this order and its
+        // reservation until reconciliation; never create a second payment blindly.
+        throw new ServiceUnavailableException({
+          message: 'No pudimos confirmar el inicio del pago. Reintentá con el mismo pedido; la reserva se revisará automáticamente.',
+          orderId: order.id,
+        });
       }
     } catch (error) {
       if (!committed) await transaction.rollback();
+      if (error instanceof UniqueConstraintError) {
+        const existing = await Order.findOne({ where: { checkoutKey } });
+        if (existing) return this.replay(existing, checkoutHash);
+      }
       throw error;
     }
   }

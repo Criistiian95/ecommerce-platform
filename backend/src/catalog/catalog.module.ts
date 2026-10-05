@@ -1,3 +1,4 @@
+import { ReservationWorker } from './reservation-worker.service';
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { CatalogController } from './catalog.controller';
@@ -14,6 +15,6 @@ import { RolesGuard } from '../auth/roles.guard';
 @Module({
   imports: [AuthModule],
   controllers: [CatalogController, CatalogPublicController],
-  providers: [CatalogService, PublicCatalogService, PublicCartService, PublicCheckoutService, OrderEmailService, MercadoPagoService, AuthGuard, RolesGuard],
+  providers: [ReservationWorker, CatalogService, PublicCatalogService, PublicCartService, PublicCheckoutService, OrderEmailService, MercadoPagoService, AuthGuard, RolesGuard],
 })
 export class CatalogModule {}

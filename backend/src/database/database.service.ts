@@ -173,6 +173,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       }
     };
 
+
+
     await this.sequelize.query(
       "ALTER TABLE orders MODIFY status ENUM('pending','pending_payment','confirmed','preparing','shipped','delivered','cancelled') NOT NULL DEFAULT 'pending_payment'"
     );
@@ -198,8 +200,26 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
+  private async ensureCheckoutColumns() {
+    const [tables] = await this.sequelize.query("SHOW TABLES LIKE 'orders'");
+    if (!(tables as unknown[]).length) return;
+    const columns = [
+      ['checkout_key', 'checkout_key VARCHAR(64) NULL, ADD UNIQUE KEY uq_orders_checkout_key (checkout_key)'],
+      ['checkout_hash', 'checkout_hash VARCHAR(64) NULL'],
+      ['reservation_expires_at', 'reservation_expires_at DATETIME NULL'],
+      ['reservation_checked_at', 'reservation_checked_at DATETIME NULL'],
+      ['payment_review_required', 'payment_review_required TINYINT(1) NOT NULL DEFAULT 0'],
+    ];
+    for (const [name, definition] of columns) {
+      const [found] = await this.sequelize.query(`SHOW COLUMNS FROM orders LIKE '${name}'`);
+      if (!(found as unknown[]).length) await this.sequelize.query(`ALTER TABLE orders ADD COLUMN ${definition}`);
+    }
+  }
+
   async onModuleInit() {
     await this.authenticateWithRetry();
+    // Existing tables need the columns before sync can create their indexes.
+    await this.ensureCheckoutColumns();
 
     if (process.env.DB_SYNC === 'true') {
       await this.sequelize.sync();

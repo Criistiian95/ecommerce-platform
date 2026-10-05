@@ -12,6 +12,7 @@ type PaymentStatus = {
   orderNumber: string;
   status: string;
   paymentStatus: 'pending' | 'paid' | 'rejected' | 'cancelled' | 'refunded';
+  paymentReviewRequired?: boolean;
   total: number;
   deliveryMethod: 'pickup' | 'shipping';
   checkoutUrl?: string | null;
@@ -38,7 +39,9 @@ export default function PaymentResultPage() {
 
       setStatus(data);
 
-      if (data.paymentStatus === 'paid') {
+      if (data.paymentReviewRequired) {
+        setMessage('Recibimos el pago, pero el pedido requiere revisión del comercio. Comunicate indicando el número de pedido.');
+      } else if (data.paymentStatus === 'paid') {
         clearCart();
         localStorage.removeItem('last_pending_order');
         setMessage('Pago aprobado.');
@@ -90,7 +93,7 @@ export default function PaymentResultPage() {
     };
   }, []);
 
-  const paid = status?.paymentStatus === 'paid';
+  const paid = status?.paymentStatus === 'paid' && !status?.paymentReviewRequired;
   const pending = status?.paymentStatus === 'pending';
 
   return (

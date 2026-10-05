@@ -19,11 +19,13 @@ type MpPayment = {
   status: string;
   status_detail?: string;
   transaction_amount?: number;
+  currency_id?: string;
   external_reference?: string | null;
 };
 
 type MpPaymentSearch = {
   results?: MpPayment[];
+  paging?: { total: number };
 };
 
 @Injectable()
@@ -45,6 +47,7 @@ export class MercadoPagoService {
 
     const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method: 'POST',
+      signal: AbortSignal.timeout(15000),
       headers: {
         Authorization: `Bearer ${this.accessToken()}`,
         'Content-Type': 'application/json',
@@ -69,7 +72,7 @@ export class MercadoPagoService {
         },
         auto_return: 'approved',
         expires: true,
-        expiration_date_to: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        expiration_date_to: (order.reservationExpiresAt ?? new Date(Date.now() + 30 * 60 * 1000)).toISOString(),
       }),
     });
 
@@ -133,6 +136,7 @@ export class MercadoPagoService {
     const response = await fetch(
       `https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}`,
       {
+        signal: AbortSignal.timeout(15000),
         headers: {
           Authorization: `Bearer ${this.accessToken()}`,
           Accept: 'application/json',
@@ -155,11 +159,13 @@ export class MercadoPagoService {
       external_reference: orderId,
       sort: 'date_created',
       criteria: 'desc',
+      limit: '100',
     });
 
     const response = await fetch(
       `https://api.mercadopago.com/v1/payments/search?${params.toString()}`,
       {
+        signal: AbortSignal.timeout(15000),
         headers: {
           Authorization: `Bearer ${this.accessToken()}`,
           Accept: 'application/json',
@@ -174,7 +180,11 @@ export class MercadoPagoService {
       );
     }
 
-    return data?.results ?? [];
+    if (!Array.isArray(data?.results) || !Number.isFinite(data?.paging?.total) ||
+        data!.paging!.total > data!.results!.length) {
+      throw new Error('Incomplete payment search; reservation retained for safety');
+    }
+    return data.results;
   }
 
   async processPaymentNotification(paymentId: string) {
@@ -191,12 +201,12 @@ export class MercadoPagoService {
     const amount = Number(payment.transaction_amount ?? 0);
     const expectedAmount = Number(order.total);
 
-    if (payment.status === 'approved' && amount >= expectedAmount) {
+    if (payment.status === 'approved' && payment.currency_id === 'ARS' && Math.round(amount * 100) === Math.round(expectedAmount * 100)) {
       await this.confirmPaidOrder(order);
       return;
     }
 
-    if (payment.status === 'refunded') {
+    if (payment.status === 'refunded' && order.paymentStatus === 'paid') {
       await order.update({ paymentStatus: 'refunded' });
     }
   }
@@ -205,6 +215,7 @@ export class MercadoPagoService {
     if (order.paymentStatus === 'paid') return;
 
     const transaction = await Order.sequelize!.transaction();
+    let committed = false;
 
     try {
       const lockedOrder = await Order.findByPk(order.id, {
@@ -214,6 +225,15 @@ export class MercadoPagoService {
 
       if (!lockedOrder || lockedOrder.paymentStatus === 'paid') {
         await transaction.rollback();
+        return;
+      }
+
+      // A delayed approval must never resurrect a released reservation.
+      if (lockedOrder.status !== 'pending_payment' || lockedOrder.paymentStatus !== 'pending') {
+        await lockedOrder.update({ paymentStatus: 'paid', paidAt: new Date(), paymentReviewRequired: true }, { transaction });
+        await transaction.commit();
+        committed = true;
+        console.error('Paid order requires manual stock/payment review', lockedOrder.id);
         return;
       }
 
@@ -242,6 +262,7 @@ export class MercadoPagoService {
       );
 
       await transaction.commit();
+      committed = true;
 
       const commerce = await Commerce.findByPk(lockedOrder.commerceId, {
         attributes: ['name'],
@@ -270,7 +291,7 @@ export class MercadoPagoService {
         });
       }
     } catch (error) {
-      await transaction.rollback();
+      if (!committed) await transaction.rollback();
       throw error;
     }
   }
@@ -282,6 +303,7 @@ export class MercadoPagoService {
     if (order.paymentStatus !== 'pending' || order.status !== 'pending_payment') return;
 
     const transaction = await Order.sequelize!.transaction();
+    let committed = false;
 
     try {
       const lockedOrder = await Order.findByPk(order.id, {
@@ -300,6 +322,7 @@ export class MercadoPagoService {
 
       const items = await OrderItem.findAll({
         where: { orderId: lockedOrder.id },
+        order: [['productId', 'ASC']],
         transaction,
       });
 
@@ -340,10 +363,39 @@ export class MercadoPagoService {
       );
 
       await transaction.commit();
+      committed = true;
     } catch (error) {
-      await transaction.rollback();
+      if (!committed) await transaction.rollback();
       throw error;
     }
+  }
+
+  async reconcileExpiredReservation(order: Order) {
+    if (order.paymentStatus !== 'pending' || order.status !== 'pending_payment') return;
+    let expiresAt = order.reservationExpiresAt;
+    if (!expiresAt) {
+      if (!order.mpOrderId) return; // Legacy incomplete checkout: needs manual reconciliation.
+      const response = await fetch(`https://api.mercadopago.com/checkout/preferences/${encodeURIComponent(order.mpOrderId)}`, {
+        signal: AbortSignal.timeout(15000), headers: { Authorization: `Bearer ${this.accessToken()}` },
+      });
+      if (!response.ok) throw new Error('Cannot verify legacy preference expiration');
+      const preference = await response.json() as { expires?: boolean; expiration_date_to?: string };
+      if (!preference.expires || !preference.expiration_date_to) return;
+      expiresAt = new Date(preference.expiration_date_to);
+      if (!Number.isFinite(expiresAt.getTime())) return;
+      await order.update({ reservationExpiresAt: expiresAt });
+    }
+    // Grace period for notifications/search propagation after checkout expiration.
+    if (expiresAt.getTime() + 5 * 60 * 1000 > Date.now()) return;
+    const payments = await this.searchPayments(order.id);
+    const approved = payments.filter(payment => payment.status === 'approved');
+    if (approved.length) {
+      for (const payment of approved) await this.processPaymentNotification(String(payment.id));
+      return; // Even an amount mismatch must be reviewed, never released automatically.
+    }
+    const terminal = new Set(['rejected', 'cancelled', 'refunded']);
+    if (payments.some(payment => !terminal.has(payment.status))) return;
+    await this.releaseReservation(order, 'cancelled');
   }
 
   async getPublicOrderStatus(slug: string, orderId: string) {
@@ -363,8 +415,8 @@ export class MercadoPagoService {
         const payments = await this.searchPayments(order.id);
         const approved = payments.find(
           payment =>
-            payment.status === 'approved' &&
-            Number(payment.transaction_amount ?? 0) >= Number(order!.total),
+            payment.status === 'approved' && payment.currency_id === 'ARS' &&
+            Math.round(Number(payment.transaction_amount ?? 0) * 100) === Math.round(Number(order!.total) * 100),
         );
 
         if (approved) {
@@ -381,10 +433,11 @@ export class MercadoPagoService {
       orderNumber: order.orderNumber,
       status: order.status,
       paymentStatus: order.paymentStatus,
+      paymentReviewRequired: order.paymentReviewRequired,
       total: Number(order.total),
       deliveryMethod: order.deliveryMethod,
       checkoutUrl:
-        order.paymentStatus === 'pending' ? order.mpCheckoutUrl : null,
+        order.paymentStatus === 'pending' && (!order.reservationExpiresAt || order.reservationExpiresAt > new Date()) ? order.mpCheckoutUrl : null,
     };
   }
 }

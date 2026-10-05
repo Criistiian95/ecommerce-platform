@@ -39,6 +39,7 @@ export class CatalogPublicController {
     @Param('slug') slug: string,
     @Body()
     body: {
+      checkoutKey: string;
       customerName: string;
       customerEmail: string;
       customerPhone: string;
