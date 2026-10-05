@@ -12,6 +12,7 @@ export class Order extends Model {
   declare reservationCheckedAt: Date | null;
   declare paymentReviewRequired: boolean;
   declare commerceId: string;
+  declare customerId: string | null;
   declare orderNumber: string;
   declare status: OrderStatus;
   declare paymentStatus: PaymentStatus;
@@ -44,6 +45,11 @@ export class Order extends Model {
           type: DataTypes.UUID,
           allowNull: false,
           field: 'commerce_id',
+        },
+        customerId: {
+          type: DataTypes.UUID,
+          allowNull: true,
+          field: 'customer_id',
         },
         orderNumber: {
           type: DataTypes.STRING(40),
@@ -122,6 +128,7 @@ export class Order extends Model {
         indexes: [
           { fields: ['commerce_id', 'created_at'], name: 'ix_orders_commerce_created' },
           { fields: ['commerce_id', 'status'], name: 'ix_orders_commerce_status' },
+          { fields: ['commerce_id', 'customer_id'], name: 'ix_orders_commerce_customer' },
         ],
       },
     );
