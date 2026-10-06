@@ -92,3 +92,5 @@
 :global(.store-logo){width:43px;height:43px;border-radius:12px;object-fit:contain;background:#fff;border:1px solid var(--line);padding:3px}
 :global(.store-hours){display:block;white-space:pre-line;margin-top:6px;color:var(--muted);max-width:320px}
 @media(max-width:640px){:global(.store-logo){width:35px;height:35px;border-radius:10px}}
+
+:global(.commerce-access-link){font-weight:700;color:var(--accent);white-space:nowrap}
