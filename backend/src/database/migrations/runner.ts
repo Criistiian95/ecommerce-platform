@@ -4,7 +4,7 @@ import type { Connection } from 'mysql2';
 import { baseline } from './baseline';
 
 type Query = (sql: string, values?: unknown[]) => Promise<any[]>;
-const versions = ['001_baseline', '002_legacy_checkout', '003_email_outbox', '004_customer_accounts', '005_commerce_branding'];
+const versions = ['001_baseline', '002_legacy_checkout', '003_email_outbox', '004_customer_accounts', '005_commerce_branding', '006_commerce_payments'];
 async function legacy(query: Query) {
   const columns: Record<string, Record<string, string>> = {
     products: { image_data: 'MEDIUMBLOB NULL', image_mime_type: 'VARCHAR(60) NULL', brand: 'VARCHAR(120) NULL', cost: 'DECIMAL(14,2) NULL', offer_price: 'DECIMAL(14,2) NULL', published: 'TINYINT(1) NOT NULL DEFAULT 1', featured: 'TINYINT(1) NOT NULL DEFAULT 0' },
@@ -84,7 +84,7 @@ export async function runMigrations(sequelize: Sequelize) {
         if (!(await query("SHOW INDEX FROM orders WHERE Key_name = 'ix_orders_commerce_customer'")).length) {
           await query('ALTER TABLE orders ADD INDEX ix_orders_commerce_customer (commerce_id, customer_id)');
         }
-      } else {
+      } else if (version === '005_commerce_branding') {
         const columns: Record<string, string> = {
           tagline: 'VARCHAR(180) NULL',
           primary_color: "VARCHAR(20) NOT NULL DEFAULT '#245ce6'",
@@ -106,6 +106,21 @@ export async function runMigrations(sequelize: Sequelize) {
             await query(`ALTER TABLE commerces ADD COLUMN \`${name}\` ${type}`);
           }
         }
+      }
+      if (version === '006_commerce_payments') {
+        await query(`CREATE TABLE IF NOT EXISTS mp_connections (
+          commerce_id CHAR(36) BINARY PRIMARY KEY, collector_id VARCHAR(40) NOT NULL UNIQUE,
+          credentials TEXT NOT NULL, expires_at DATETIME NOT NULL,
+          created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL,
+          FOREIGN KEY (commerce_id) REFERENCES commerces(id) ON DELETE RESTRICT
+        ) ENGINE=InnoDB`);
+        await query(`CREATE TABLE IF NOT EXISTS mp_oauth_states (
+          id VARCHAR(64) PRIMARY KEY, commerce_id CHAR(36) BINARY NOT NULL, user_id CHAR(36) BINARY NOT NULL,
+          verifier TEXT NOT NULL, expires_at DATETIME NOT NULL,
+          created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL, INDEX ix_oauth_expiry (expires_at)
+        ) ENGINE=InnoDB`);
+        if (!(await query("SHOW COLUMNS FROM orders WHERE Field = 'mp_collector_id'")).length)
+          await query('ALTER TABLE orders ADD COLUMN mp_collector_id VARCHAR(40) NULL');
       }
       // DDL is not transactional in MySQL; every step above is safe to resume.
       await query('INSERT INTO schema_migrations (version, applied_at) VALUES (?, NOW())', [version]);

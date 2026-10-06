@@ -1,3 +1,4 @@
+import { MpConnection, MpOAuthState } from './models/mp-connection.model';
 import { assertMigrationsCurrent } from './migrations/runner';
 import { OrderEmailDelivery } from './models/order-email-delivery.model';
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
@@ -36,6 +37,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     });
 
     Commerce.register(this.sequelize);
+    MpConnection.register(this.sequelize);
+    MpOAuthState.register(this.sequelize);
     User.register(this.sequelize);
     Session.register(this.sequelize);
     Category.register(this.sequelize);

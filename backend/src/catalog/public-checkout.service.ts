@@ -126,6 +126,8 @@ export class PublicCheckoutService {
     })).digest('hex');
     const existing = await Order.findOne({ where: { checkoutKey } });
     if (existing) return this.replay(existing, checkoutHash);
+    // Fail before reserving inventory when this seller has no usable payment connection.
+    const paymentAccount = await this.mercadoPago.prepareCheckout(commerce.id);
     const transaction = await Product.sequelize!.transaction();
     let committed = false;
 
@@ -134,6 +136,7 @@ export class PublicCheckoutService {
 
       const order = await Order.create({
         commerceId: commerce.id,
+        mpCollectorId: paymentAccount.collectorId,
         customerId: account?.id ?? null,
         checkoutKey, checkoutHash,
         reservationExpiresAt: new Date(Date.now() + 30 * 60 * 1000),

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Payments from './payments';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import styles from './settings.module.css';
 
@@ -182,6 +183,8 @@ export default function CommerceSettingsPage(){
           <p>Personalizá la identidad, contacto y modalidades de entrega de tu comercio.</p>
         </div>
       </section>
+
+      <Payments token={token} />
 
       {message && <div className={messageType==='success'?'settings-message success':'settings-message error'}>{message}</div>}
 

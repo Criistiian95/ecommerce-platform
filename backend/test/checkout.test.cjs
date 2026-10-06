@@ -37,7 +37,7 @@ function fixture(stock = 10) {
   mock.method(Product, 'findOne', async options => { assert.equal(options.lock, 'UPDATE'); assert.ok(options.transaction); return row({ ...product, async update(values, options) { assert.ok(options.transaction); Object.assign(product, values); Object.assign(this, values); return this; } }); });
   mock.method(OrderItem, 'create', async values => { state.lines.push(values); });
   mock.method(StockMovement, 'create', async (values, options) => { assert.ok(options.transaction); state.movements.push(values); });
-  const payment = { async createCheckout(order) { state.creates++; await order.update({ mpOrderId: 'mp', mpCheckoutUrl: 'https://payment.example' }); return { checkoutUrl: order.mpCheckoutUrl }; } };
+  const payment = { async prepareCheckout() { return { collectorId: '123' }; }, async createCheckout(order) { state.creates++; await order.update({ mpOrderId: 'mp', mpCheckoutUrl: 'https://payment.example' }); return { checkoutUrl: order.mpCheckoutUrl }; } };
   return { state, product, payment, service: new PublicCheckoutService(payment) };
 }
 test('groups duplicate products and rejects invalid/overflow quantities', () => {
@@ -96,7 +96,7 @@ test('expiry releases only terminal/no payment results', async () => {
   await service.reconcileExpiredReservation(expired()); search.mock.mockImplementation(async () => [{ status: 'rejected' }, { status: 'cancelled' }]); await service.reconcileExpiredReservation(expired()); assert.equal(release.mock.callCount(), 2);
 });
 test('MP lookup failure and incomplete search never release stock', async () => {
-  const service = new MercadoPagoService({}); mock.method(service, 'accessToken', () => 'test'); mock.method(global, 'fetch', async () => ({ ok: true, json: async () => ({ results: [], paging: { total: 101 } }) })); const release = mock.method(service, 'releaseReservation', async () => {});
+  const service = new MercadoPagoService({}); mock.method(service, 'orderCredentials', async () => ({ token: 'test', collectorId: '123' })); mock.method(global, 'fetch', async () => ({ ok: true, json: async () => ({ results: [], paging: { total: 101 } }) })); const release = mock.method(service, 'releaseReservation', async () => {});
   await assert.rejects(service.reconcileExpiredReservation(expired()), /Incomplete/); assert.equal(release.mock.callCount(), 0);
 });
 test('approved payment reconciles before any stock release', async () => {

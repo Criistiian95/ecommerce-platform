@@ -28,7 +28,7 @@ async function fixture(stock = 10) {
   const user = await User.create({ commerceId: commerce.id, email: `${randomUUID()}@example.com`, name: 'Test', passwordHash: 'unused-test-only', role: 'admin' });
   const product = await Product.create({ commerceId: commerce.id, sku: 'SKU', name: 'Test', price: 100, currentStock: stock });
   let preferences = 0;
-  const checkout = new PublicCheckoutService({ async createCheckout(order) {
+  const checkout = new PublicCheckoutService({ async prepareCheckout() { return { collectorId: '123' }; }, async createCheckout(order) {
     preferences++;
     await order.update({ mpOrderId: randomUUID(), mpCheckoutUrl: 'https://example.com/test-checkout' });
     return { checkoutUrl: order.mpCheckoutUrl };
@@ -49,7 +49,7 @@ test('MySQL: versioned legacy upgrade is repeatable and startup is read-only', a
   await db.onModuleInit();
   assert.equal(statements.some(sql => /ALTER|CREATE|DROP/i.test(sql)), false);
   const [versions] = await original('SELECT version FROM schema_migrations');
-  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding']);
+  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding', '006_commerce_payments']);
   const [indexes] = await db.sequelize.query("SHOW INDEX FROM orders WHERE Column_name = 'checkout_key'");
   assert.ok(indexes.some(index => index.Non_unique === 0));
 });
@@ -180,4 +180,66 @@ test('MySQL: payment filters, pagination validation and email detail', async () 
   const detail = await admin.detail(f.commerce.id, f.order.id); assert.equal(detail.email.status, 'pending');
   await assert.rejects(admin.list(f.commerce.id, 'all', undefined, 'unknown', '1'), /inválido/);
   await assert.rejects(admin.list(f.commerce.id, 'all', undefined, 'all', '-1'), /inválida/);
+});
+
+const { MpConnectionService } = require('../dist/catalog/mp-connection.service');
+const { MpConnection, MpOAuthState } = require('../dist/database/models/mp-connection.model');
+const { createHash } = require('node:crypto');
+process.env.MP_TOKEN_ENCRYPTION_KEY = Buffer.alloc(32, 8).toString('base64');
+process.env.MP_CLIENT_ID = 'test-client';
+process.env.MP_CLIENT_SECRET = 'test-secret';
+process.env.MP_OAUTH_REDIRECT_URI = 'https://shop.example/admin/configuracion';
+function mockOAuth(seller) {
+  return mock.method(global, 'fetch', async () => ({ ok: true, json: async () => ({ access_token: 'access-secret', refresh_token: 'refresh-secret', user_id: seller, expires_in: 3600 }) }));
+}
+test('MySQL OAuth: state rejects another commerce/user, is consumed once and stores encrypted tokens', async () => {
+  const a = await fixture(), b = await fixture(), service = new MpConnectionService();
+  const { url } = await service.start(a.commerce.id, a.user.id);
+  const state = new URL(url).searchParams.get('state');
+  const provider = mockOAuth(10001);
+  await assert.rejects(service.finish(b.commerce.id, b.user.id, state, 'code'), /otra sesión/);
+  await assert.rejects(service.finish(a.commerce.id, b.user.id, state, 'code'), /otra sesión/);
+  assert.equal(provider.mock.callCount(), 0);
+  const result = await service.finish(a.commerce.id, a.user.id, state, 'code');
+  assert.equal(result.connected, true); assert.equal(result.collectorId, '10001');
+  assert.equal(result.credentials, undefined);
+  const row = await MpConnection.findByPk(a.commerce.id);
+  assert.ok(!row.credentials.includes('access-secret'));
+  await assert.rejects(service.finish(a.commerce.id, a.user.id, state, 'code'), /venció/);
+  assert.equal(provider.mock.callCount(), 1);
+});
+test('MySQL OAuth: expired authorization never calls provider', async () => {
+  const a = await fixture(), service = new MpConnectionService();
+  const { url } = await service.start(a.commerce.id, a.user.id), state = new URL(url).searchParams.get('state');
+  await MpOAuthState.update({ expiresAt: new Date(0) }, { where: { id: createHash('sha256').update(state).digest('hex') } });
+  const provider = mockOAuth(10002);
+  await assert.rejects(service.finish(a.commerce.id, a.user.id, state, 'code'), /venció/);
+  assert.equal(provider.mock.callCount(), 0);
+});
+test('MySQL OAuth: concurrent token requests refresh once and keep commerce ownership', async () => {
+  const a = await fixture(), service = new MpConnectionService();
+  await MpConnection.create({ commerceId: a.commerce.id, collectorId: '10003', credentials: service.encrypt(JSON.stringify({ access_token: 'old', refresh_token: 'refresh' }), a.commerce.id), expiresAt: new Date(0) });
+  const provider = mockOAuth(10003);
+  const results = await Promise.all([service.credentials(a.commerce.id), service.credentials(a.commerce.id)]);
+  assert.equal(provider.mock.callCount(), 1);
+  assert.ok(results.every(result => result.collectorId === '10003' && result.token === 'access-secret'));
+});
+test('MySQL OAuth: one seller cannot connect two commerces or replace an existing seller', async () => {
+  const a = await fixture(), b = await fixture(), service = new MpConnectionService();
+  const provider = mockOAuth(10004);
+  async function connect(f) {
+    const { url } = await service.start(f.commerce.id, f.user.id);
+    return service.finish(f.commerce.id, f.user.id, new URL(url).searchParams.get('state'), 'code');
+  }
+  await connect(a);
+  await assert.rejects(connect(b), /otro comercio/);
+  provider.mock.mockImplementation(async () => ({ ok: true, json: async () => ({ access_token: 'new', refresh_token: 'refresh', user_id: 10005, expires_in: 3600 }) }));
+  await assert.rejects(connect(a), /cuenta original/);
+  assert.equal((await service.status(a.commerce.id)).collectorId, '10004');
+});
+test('MySQL OAuth: checkout without connection creates no order and reserves no stock', async () => {
+  const f = await fixture(), service = new PublicCheckoutService(new MercadoPagoService({}, new MpConnectionService()));
+  await assert.rejects(service.createOrder(f.commerce.slug, f.request), /no conectó/);
+  assert.equal(await Order.count({ where: { commerceId: f.commerce.id } }), 0);
+  assert.equal((await f.product.reload()).currentStock, 10);
 });
