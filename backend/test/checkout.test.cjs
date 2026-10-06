@@ -28,7 +28,7 @@ function fixture(stock = 10) {
     if (!callback) return tx;
     try { const result = await callback(tx); await tx.commit(); return result; } catch (error) { await tx.rollback(); throw error; }
   });
-  mock.method(Commerce, 'findOne', async () => ({ id: 'c' }));
+  mock.method(Commerce, 'findOne', async () => ({ id: 'c', pickupEnabled: true, shippingEnabled: true }));
   mock.method(Order, 'findOne', async ({ where }) => state.orders.find(o => o.checkoutKey === where.checkoutKey) || null);
   mock.method(Order, 'create', async values => {
     if (state.orders.some(o => o.checkoutKey === values.checkoutKey)) throw new UniqueConstraintError({});
@@ -46,7 +46,7 @@ test('groups duplicate products and rejects invalid/overflow quantities', () => 
   assert.throws(() => normalizeCartItems({}));
 });
 test('cart validation uses the combined quantity', async () => {
-  mock.method(Commerce, 'findOne', async () => ({ id: 'c' }));
+  mock.method(Commerce, 'findOne', async () => ({ id: 'c', pickupEnabled: true, shippingEnabled: true }));
   mock.method(Product, 'findAll', async () => [{ id: 'p', currentStock: 3 }]);
   const result = await new PublicCartService().validateCart('demo', [{ productId: 'p', quantity: 2 }, { productId: 'p', quantity: 2 }]);
   assert.equal(result.valid, false); assert.equal(result.items.length, 1);

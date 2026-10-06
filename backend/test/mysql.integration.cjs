@@ -49,7 +49,7 @@ test('MySQL: versioned legacy upgrade is repeatable and startup is read-only', a
   await db.onModuleInit();
   assert.equal(statements.some(sql => /ALTER|CREATE|DROP/i.test(sql)), false);
   const [versions] = await original('SELECT version FROM schema_migrations');
-  assert.equal(versions.length, 3);
+  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding']);
   const [indexes] = await db.sequelize.query("SHOW INDEX FROM orders WHERE Column_name = 'checkout_key'");
   assert.ok(indexes.some(index => index.Non_unique === 0));
 });
@@ -146,4 +146,38 @@ test('MySQL: missing credentials do not consume attempts; refunded order does no
   await new OrderEmailWorker(f.email).run(); assert.equal((await f.delivery.reload()).attempts, 0);
   configured(); await f.order.update({ paymentStatus: 'refunded' });
   await new OrderEmailWorker(f.email).run(); assert.equal(send.mock.callCount(), 0); assert.equal((await f.delivery.reload()).lastError, 'order_not_confirmed');
+});
+
+const { AdminOrdersService } = require('../dist/catalog/admin-orders.service');
+test('MySQL: order panel isolates commerce detail and mutations', async () => {
+  const f = await paidFixture(); const other = await fixture(); const admin = new AdminOrdersService();
+  await assert.rejects(admin.detail(other.commerce.id, f.order.id), /no encontrado/);
+  await assert.rejects(admin.updateStatus(other.commerce.id, other.user.id, f.order.id, 'cancelled'), /no encontrado/);
+  const list = await admin.list(other.commerce.id, 'all', f.order.orderNumber, 'all', '1');
+  assert.equal(list.total, 0);
+});
+test('MySQL: pickup skips shipping and rejects backwards/unpaid transitions', async () => {
+  const f = await paidFixture(); const admin = new AdminOrdersService();
+  await assert.rejects(admin.updateStatus(f.commerce.id, f.user.id, f.order.id, 'delivered'), /no está permitido/);
+  await admin.updateStatus(f.commerce.id, f.user.id, f.order.id, 'preparing');
+  await assert.rejects(admin.updateStatus(f.commerce.id, f.user.id, f.order.id, 'shipped'), /no está permitido/);
+  await admin.updateStatus(f.commerce.id, f.user.id, f.order.id, 'delivered');
+  await assert.rejects(admin.updateStatus(f.commerce.id, f.user.id, f.order.id, 'cancelled'), /no está permitido/);
+  const unpaid = await fixture(); const result = await unpaid.checkout.createOrder(unpaid.commerce.slug, unpaid.request);
+  await assert.rejects(admin.updateStatus(unpaid.commerce.id, unpaid.user.id, result.order.id, 'cancelled'), /no está permitido/);
+});
+test('MySQL: concurrent admin cancellations return stock once and preserve paid status', async () => {
+  const f = await paidFixture(); const admin = new AdminOrdersService();
+  await Promise.all([admin.updateStatus(f.commerce.id, f.user.id, f.order.id, 'cancelled'), admin.updateStatus(f.commerce.id, f.user.id, f.order.id, 'cancelled')]);
+  assert.equal((await f.product.reload()).currentStock, 10);
+  await f.order.reload(); assert.equal(f.order.status, 'cancelled'); assert.equal(f.order.paymentStatus, 'paid'); assert.equal(f.order.paymentReviewRequired, true);
+  assert.equal(await StockMovement.count({where:{productId:f.product.id,type:'return'}}), 1);
+});
+test('MySQL: payment filters, pagination validation and email detail', async () => {
+  const f = await paidFixture(); const admin = new AdminOrdersService();
+  const list = await admin.list(f.commerce.id, 'confirmed', undefined, 'paid', '1');
+  assert.equal(list.total, 1); assert.equal(list.orders[0].id, f.order.id);
+  const detail = await admin.detail(f.commerce.id, f.order.id); assert.equal(detail.email.status, 'pending');
+  await assert.rejects(admin.list(f.commerce.id, 'all', undefined, 'unknown', '1'), /inválido/);
+  await assert.rejects(admin.list(f.commerce.id, 'all', undefined, 'all', '-1'), /inválida/);
 });

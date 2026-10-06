@@ -21,8 +21,10 @@ export class AdminOrdersController {
     @Req() req: AuthenticatedRequest,
     @Query('status') status?: string,
     @Query('search') search?: string,
+    @Query('payment') payment?: string,
+    @Query('page') page?: string,
   ) {
-    return this.orders.list(req.auth!.commerceId, status, search);
+    return this.orders.list(req.auth!.commerceId, status, search, payment, page);
   }
 
   @Get(':id')
