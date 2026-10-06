@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import styles from './orders.module.css';
 
 type OrderItem = {
@@ -31,6 +31,8 @@ type Order = {
   createdAt: string;
   paymentReviewRequired?: boolean;
   items: OrderItem[];
+  allowedActions: string[];
+  email?: { status: string; attempts: number; sentAt?: string } | null;
 };
 
 type Summary = {
@@ -67,6 +69,11 @@ export default function AdminOrdersPage() {
   const [selected,setSelected] = useState<Order | null>(null);
   const [search,setSearch] = useState('');
   const [status,setStatus] = useState('all');
+  const [payment,setPayment] = useState('all');
+  const [page,setPage] = useState(1);
+  const [total,setTotal] = useState(0);
+  const requestId = useRef(0);
+  const detailId = useRef(0);
   const [loading,setLoading] = useState(true);
   const [saving,setSaving] = useState(false);
   const [toast,setToast] = useState<{type:'success'|'error';text:string}|null>(null);
@@ -89,12 +96,13 @@ export default function AdminOrdersPage() {
     return () => window.clearTimeout(timer);
   },[toast]);
 
-  async function load(currentToken=token,currentStatus=status,currentSearch=search) {
+  async function load(currentToken=token,currentStatus=status,currentSearch=search,currentPayment=payment,currentPage=page) {
     if (!currentToken) return;
+    const request = ++requestId.current;
     setLoading(true);
     try {
       const headers = { Authorization:`Bearer ${currentToken}` };
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({payment:currentPayment,page:String(currentPage)});
       if (currentStatus !== 'all') params.set('status',currentStatus);
       if (currentSearch.trim()) params.set('search',currentSearch.trim());
 
@@ -105,22 +113,38 @@ export default function AdminOrdersPage() {
 
       if (!ordersRes.ok || !summaryRes.ok) throw new Error();
 
-      const nextOrders: Order[] = await ordersRes.json();
-      setOrders(nextOrders);
-      setSummary(await summaryRes.json());
+      const result = await ordersRes.json();
+      const nextSummary = await summaryRes.json();
+      if (request !== requestId.current) return;
+      const nextOrders: Order[] = result.orders;
+      setOrders(nextOrders); setPage(result.page); setTotal(result.total);
+      setSummary(nextSummary);
 
       if (selected) {
         const refreshed = nextOrders.find(order => order.id === selected.id);
-        setSelected(refreshed ?? null);
+        if (refreshed) void openDetail(refreshed);
+        else { detailId.current++; setSelected(null); }
       }
     } catch {
-      setToast({type:'error',text:'No se pudieron cargar los pedidos.'});
+      if (request === requestId.current) setToast({type:'error',text:'No se pudieron cargar los pedidos. Revisá tu sesión y volvé a intentar.'});
     } finally {
-      setLoading(false);
+      if (request === requestId.current) setLoading(false);
     }
   }
 
+  async function openDetail(order: Order) {
+    const request = ++detailId.current;
+    setSelected(order);
+    try {
+      const response = await fetch(`${API}/admin/orders/${order.id}`, { headers: authHeaders });
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+      if (request === detailId.current) setSelected(data);
+    } catch { if (request === detailId.current) setToast({type:'error',text:'No se pudo actualizar el detalle. Intentá nuevamente.'}); }
+  }
+
   async function changeStatus(order:Order,nextStatus:string) {
+    if (saving) return;
     setSaving(true);
     try {
       const response = await fetch(`${API}/admin/orders/${order.id}/status`,{
@@ -137,6 +161,7 @@ export default function AdminOrdersPage() {
 
       setToast({type:'success',text:`Pedido actualizado a ${statusLabels[nextStatus] ?? nextStatus}.`});
       await load();
+      detailId.current++;
       setSelected(data);
     } catch {
       setToast({type:'error',text:'No se pudo conectar con el servidor.'});
@@ -210,16 +235,17 @@ export default function AdminOrdersPage() {
           <div className="orders-search">
             <span>⌕</span>
             <input
+              aria-label="Buscar pedidos"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && void load(token,status,search)}
+              onKeyDown={e => e.key === 'Enter' && void load(token,status,search,payment,1)}
               placeholder="Buscar por pedido, cliente, email o teléfono"
             />
           </div>
-          <select value={status} onChange={e => {
+          <select aria-label="Filtrar por estado" value={status} onChange={e => {
             const next=e.target.value;
             setStatus(next);
-            void load(token,next,search);
+            void load(token,next,search,payment,1);
           }}>
             <option value="all">Todos los estados</option>
             <option value="pending_payment">Pendiente de pago</option>
@@ -229,7 +255,11 @@ export default function AdminOrdersPage() {
             <option value="delivered">Entregado</option>
             <option value="cancelled">Cancelado</option>
           </select>
-          <button className="btn primary" onClick={() => void load()}>Buscar</button>
+          <select aria-label="Filtrar por pago" value={payment} onChange={e => {setPayment(e.target.value); void load(token,status,search,e.target.value,1);}}>
+            <option value="all">Todos los pagos</option>
+            {Object.entries(paymentLabels).map(([value,label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+          <button className="btn primary" disabled={loading} onClick={() => void load(token,status,search,payment,1)}>Buscar</button>
         </div>
       </section>
 
@@ -238,7 +268,7 @@ export default function AdminOrdersPage() {
           <div className="section-head">
             <div>
               <h2>Pedidos</h2>
-              <p>{loading ? 'Actualizando...' : `${orders.length} pedido(s)`}</p>
+              <p>{loading ? 'Actualizando...' : `${total} pedido(s) · Página ${page}`}</p>
             </div>
           </div>
 
@@ -247,7 +277,8 @@ export default function AdminOrdersPage() {
               <button
                 key={order.id}
                 className={`order-row ${selected?.id===order.id?'selected':''}`}
-                onClick={() => setSelected(order)}
+                disabled={saving}
+                onClick={() => void openDetail(order)}
               >
                 <div className="order-main">
                   <div className="order-number-line">
@@ -271,6 +302,10 @@ export default function AdminOrdersPage() {
             {!loading && orders.length===0 && (
               <div className="orders-empty">No hay pedidos con estos filtros.</div>
             )}
+          </div>
+          <div className="order-actions" aria-label="Páginas de pedidos">
+            <button className="btn" disabled={loading || saving || page <= 1} onClick={() => void load(token,status,search,payment,page-1)}>Anterior</button>
+            <button className="btn" disabled={loading || saving || page*50 >= total} onClick={() => void load(token,status,search,payment,page+1)}>Siguiente</button>
           </div>
         </article>
 
@@ -336,26 +371,32 @@ export default function AdminOrdersPage() {
                 </div>
                 {selected.paymentReviewRequired && (
                   <div className="payment-review-alert">
-                    Este pedido requiere revisar el reintegro del pago en Mercado Pago.
+                    Este pedido requiere revisión del pago o del stock. Cancelar no realiza un reintegro automático en Mercado Pago.
                   </div>
                 )}
               </div>
 
               <div className="order-detail-section">
+                <h3>Confirmación por correo</h3>
+                <p>{selected.email ? ({pending:'Pendiente de envío',sending:'Enviando',sent:'Enviado al proveedor',failed:'Requiere revisión'}[selected.email.status] ?? selected.email.status) : 'Sin registro de envío'}</p>
+                {selected.email && <small>Intentos: {selected.email.attempts}</small>}
+              </div>
+              <div className="order-detail-section">
                 <h3>Actualizar estado</h3>
+                {selected.status === 'pending_payment' && <p>Esperando confirmación del pago. Las reservas vencidas se liberan automáticamente después de verificar Mercado Pago.</p>}
                 <div className="order-actions">
-                  {selected.status==='confirmed' && (
+                  {selected.allowedActions?.includes('preparing') && (
                     <button className="btn primary" disabled={saving} onClick={() => void changeStatus(selected,'preparing')}>Pasar a preparando</button>
                   )}
-                  {selected.status==='preparing' && (
+                  {selected.allowedActions?.includes('shipped') && (
                     <button className="btn primary" disabled={saving} onClick={() => void changeStatus(selected,'shipped')}>Marcar enviado</button>
                   )}
-                  {selected.status==='shipped' && (
+                  {selected.allowedActions?.includes('delivered') && (
                     <button className="btn primary" disabled={saving} onClick={() => void changeStatus(selected,'delivered')}>Marcar entregado</button>
                   )}
-                  {!['cancelled','delivered','shipped'].includes(selected.status) && (
+                  {selected.allowedActions?.includes('cancelled') && (
                     <button className="btn danger-btn" disabled={saving} onClick={() => {
-                      if (window.confirm('¿Cancelar este pedido? El stock será devuelto.')) {
+                      if (window.confirm('¿Cancelar este pedido y devolver su stock? Si está pagado, el reintegro debe gestionarse por separado en Mercado Pago.')) {
                         void changeStatus(selected,'cancelled');
                       }
                     }}>Cancelar pedido</button>
