@@ -89,7 +89,7 @@ export class CatalogPublicController {
     @Headers('x-signature') xSignature: string | undefined,
     @Headers('x-request-id') xRequestId: string | undefined,
     @Query('data.id') queryDataId: string | undefined,
-    @Body() body: { data?: { id?: string }; type?: string },
+    @Body() body: { data?: { id?: string }; type?: string; user_id?: number | string },
   ) {
     const dataId = queryDataId ?? body?.data?.id;
     const valid = this.mercadoPago.validateWebhookSignature(
@@ -103,7 +103,7 @@ export class CatalogPublicController {
     }
 
     if (dataId && (!body?.type || body.type === 'payment')) {
-      await this.mercadoPago.processPaymentNotification(dataId);
+      await this.mercadoPago.processPaymentNotification(dataId, undefined, String(body.user_id ?? ''));
     }
 
     return { ok: true };

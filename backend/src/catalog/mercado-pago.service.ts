@@ -1,3 +1,5 @@
+import { MpConnectionService } from './mp-connection.service';
+import { MpConnection } from '../database/models/mp-connection.model';
 import { OrderEmailDelivery } from '../database/models/order-email-delivery.model';
 import { Injectable } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'crypto';
@@ -18,6 +20,7 @@ type MpPreferenceResponse = {
 type MpPayment = {
   id: number | string;
   status: string;
+  collector_id?: number | string;
   status_detail?: string;
   transaction_amount?: number;
   currency_id?: string;
@@ -31,18 +34,31 @@ type MpPaymentSearch = {
 
 @Injectable()
 export class MercadoPagoService {
-  constructor(private readonly orderEmail: OrderEmailService) {}
+  constructor(private readonly orderEmail: OrderEmailService, private readonly connections: MpConnectionService) {}
 
-  private accessToken() {
-    const token = process.env.MP_ACCESS_TOKEN;
-    if (!token) throw new Error('MP_ACCESS_TOKEN is not configured');
-    return token;
+  private legacyCredentials() {
+    const token = process.env.MP_ACCESS_TOKEN, collectorId = process.env.MP_LEGACY_COLLECTOR_ID;
+    if (!token || !collectorId) throw new Error('Legacy payment verification is not configured');
+    return { token, collectorId };
+  }
+
+  async prepareCheckout(commerceId: string) {
+    return this.connections.credentials(commerceId);
+  }
+
+  private async orderCredentials(order: Order) {
+    if (!order.mpCollectorId) return this.legacyCredentials();
+    const credentials = await this.connections.credentials(order.commerceId);
+    if (credentials.collectorId !== order.mpCollectorId) throw new Error('Payment account changed');
+    return credentials;
   }
 
   async createCheckout(
     order: Order,
     items: Array<{ title: string; quantity: number; unitPrice: number }>,
   ) {
+    if (!order.mpCollectorId) throw new Error('New checkout requires a connected seller');
+    const { token } = await this.orderCredentials(order);
     const frontendUrl = (process.env.FRONTEND_URL ?? '').replace(/\/$/, '');
     if (!frontendUrl) throw new Error('FRONTEND_URL is not configured');
 
@@ -50,7 +66,7 @@ export class MercadoPagoService {
       method: 'POST',
       signal: AbortSignal.timeout(15000),
       headers: {
-        Authorization: `Bearer ${this.accessToken()}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
@@ -79,14 +95,13 @@ export class MercadoPagoService {
 
     const data = await response.json().catch(() => null) as MpPreferenceResponse | null;
 
-    const token = this.accessToken();
     const checkoutUrl = token.startsWith('TEST-')
       ? data?.sandbox_init_point ?? data?.init_point
       : data?.init_point;
 
     if (!response.ok || !data?.id || !checkoutUrl) {
       throw new Error(
-        `Mercado Pago preference creation failed (${response.status}): ${JSON.stringify(data)}`,
+        `Mercado Pago preference creation failed (${response.status})`,
       );
     }
 
@@ -133,13 +148,13 @@ export class MercadoPagoService {
     }
   }
 
-  private async fetchPayment(paymentId: string) {
+  private async fetchPayment(paymentId: string, token: string) {
     const response = await fetch(
       `https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}`,
       {
         signal: AbortSignal.timeout(15000),
         headers: {
-          Authorization: `Bearer ${this.accessToken()}`,
+          Authorization: `Bearer ${token}`,
           Accept: 'application/json',
         },
       },
@@ -148,16 +163,17 @@ export class MercadoPagoService {
     const data = await response.json().catch(() => null) as MpPayment | null;
     if (!response.ok || !data?.id) {
       throw new Error(
-        `Mercado Pago payment lookup failed (${response.status}): ${JSON.stringify(data)}`,
+        `Mercado Pago payment lookup failed (${response.status})`,
       );
     }
 
     return data;
   }
 
-  private async searchPayments(orderId: string) {
+  private async searchPayments(order: Order) {
+    const { token, collectorId } = await this.orderCredentials(order);
     const params = new URLSearchParams({
-      external_reference: orderId,
+      external_reference: order.id,
       sort: 'date_created',
       criteria: 'desc',
       limit: '100',
@@ -168,7 +184,7 @@ export class MercadoPagoService {
       {
         signal: AbortSignal.timeout(15000),
         headers: {
-          Authorization: `Bearer ${this.accessToken()}`,
+          Authorization: `Bearer ${token}`,
           Accept: 'application/json',
         },
       },
@@ -177,7 +193,7 @@ export class MercadoPagoService {
     const data = await response.json().catch(() => null) as MpPaymentSearch | null;
     if (!response.ok) {
       throw new Error(
-        `Mercado Pago payment search failed (${response.status}): ${JSON.stringify(data)}`,
+        `Mercado Pago payment search failed (${response.status})`,
       );
     }
 
@@ -185,19 +201,30 @@ export class MercadoPagoService {
         data!.paging!.total > data!.results!.length) {
       throw new Error('Incomplete payment search; reservation retained for safety');
     }
+    if (data.results.some(payment => String(payment.collector_id) !== collectorId || payment.external_reference !== order.id)) throw new Error('Payment search ownership mismatch');
     return data.results;
   }
 
-  async processPaymentNotification(paymentId: string) {
-    const payment = await this.fetchPayment(paymentId);
+  async processPaymentNotification(paymentId: string, expectedOrder?: Order, sellerId?: string) {
+    let credentials: { token: string; collectorId: string };
+    let connection: MpConnection | null = null;
+    if (expectedOrder) credentials = await this.orderCredentials(expectedOrder);
+    else {
+      if (!sellerId || !/^\d+$/.test(sellerId)) throw new Error('Missing payment seller');
+      connection = await MpConnection.findOne({ where: { collectorId: sellerId } });
+      credentials = connection ? await this.connections.credentials(connection.commerceId) : this.legacyCredentials();
+      if (credentials.collectorId !== sellerId) throw new Error('Unknown payment seller');
+    }
+    const payment = await this.fetchPayment(paymentId, credentials.token);
+    if (String(payment.collector_id) !== credentials.collectorId) throw new Error('Payment collector mismatch');
     const orderId = payment.external_reference;
     if (!orderId) return;
-
+    if (expectedOrder && expectedOrder.id !== orderId) throw new Error('Payment order mismatch');
     const order = await Order.findByPk(orderId);
-    if (!order) {
-      console.warn('Mercado Pago payment ignored: local order not found', orderId);
-      return;
-    }
+    if (!order) return;
+    if (order.mpCollectorId && (order.mpCollectorId !== credentials.collectorId ||
+        (connection && order.commerceId !== connection.commerceId))) throw new Error('Payment commerce mismatch');
+    if (!order.mpCollectorId && credentials.collectorId !== this.legacyCredentials().collectorId) throw new Error('Legacy collector mismatch');
 
     const amount = Number(payment.transaction_amount ?? 0);
     const expectedAmount = Number(order.total);
@@ -207,7 +234,7 @@ export class MercadoPagoService {
       return;
     }
 
-    if (payment.status === 'refunded' && order.paymentStatus === 'paid') {
+    if (payment.status === 'refunded' && payment.currency_id === 'ARS' && Math.round(amount * 100) === Math.round(expectedAmount * 100) && order.paymentStatus === 'paid') {
       await order.update({ paymentStatus: 'refunded' });
     }
   }
@@ -352,8 +379,9 @@ export class MercadoPagoService {
     let expiresAt = order.reservationExpiresAt;
     if (!expiresAt) {
       if (!order.mpOrderId) return; // Legacy incomplete checkout: needs manual reconciliation.
+      const { token } = await this.orderCredentials(order);
       const response = await fetch(`https://api.mercadopago.com/checkout/preferences/${encodeURIComponent(order.mpOrderId)}`, {
-        signal: AbortSignal.timeout(15000), headers: { Authorization: `Bearer ${this.accessToken()}` },
+        signal: AbortSignal.timeout(15000), headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error('Cannot verify legacy preference expiration');
       const preference = await response.json() as { expires?: boolean; expiration_date_to?: string };
@@ -364,10 +392,10 @@ export class MercadoPagoService {
     }
     // Grace period for notifications/search propagation after checkout expiration.
     if (expiresAt.getTime() + 5 * 60 * 1000 > Date.now()) return;
-    const payments = await this.searchPayments(order.id);
+    const payments = await this.searchPayments(order);
     const approved = payments.filter(payment => payment.status === 'approved');
     if (approved.length) {
-      for (const payment of approved) await this.processPaymentNotification(String(payment.id));
+      for (const payment of approved) await this.processPaymentNotification(String(payment.id), order);
       return; // Even an amount mismatch must be reviewed, never released automatically.
     }
     const terminal = new Set(['rejected', 'cancelled', 'refunded']);
@@ -389,7 +417,7 @@ export class MercadoPagoService {
 
     if (order.paymentStatus === 'pending') {
       try {
-        const payments = await this.searchPayments(order.id);
+        const payments = await this.searchPayments(order);
         const approved = payments.find(
           payment =>
             payment.status === 'approved' && payment.currency_id === 'ARS' &&
@@ -397,7 +425,7 @@ export class MercadoPagoService {
         );
 
         if (approved) {
-          await this.processPaymentNotification(String(approved.id));
+          await this.processPaymentNotification(String(approved.id), order);
           order = (await Order.findByPk(order.id)) ?? order;
         }
       } catch (error) {

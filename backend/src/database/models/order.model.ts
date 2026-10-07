@@ -6,6 +6,7 @@ export type DeliveryMethod = 'pickup' | 'shipping';
 
 export class Order extends Model {
   declare id: string;
+  declare mpCollectorId: string | null;
   declare checkoutKey: string | null;
   declare checkoutHash: string | null;
   declare reservationExpiresAt: Date | null;
@@ -36,6 +37,7 @@ export class Order extends Model {
           defaultValue: DataTypes.UUIDV4,
           primaryKey: true,
         },
+        mpCollectorId: { type: DataTypes.STRING(40), allowNull: true, field: 'mp_collector_id' },
         checkoutKey: { type: DataTypes.STRING(64), allowNull: true, unique: 'uq_orders_checkout_key', field: 'checkout_key' },
         checkoutHash: { type: DataTypes.STRING(64), allowNull: true, field: 'checkout_hash' },
         reservationExpiresAt: { type: DataTypes.DATE, allowNull: true, field: 'reservation_expires_at' },

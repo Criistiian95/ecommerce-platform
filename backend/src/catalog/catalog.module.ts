@@ -1,3 +1,5 @@
+import { MpConnectionService } from './mp-connection.service';
+import { MpConnectionController } from './mp-connection.controller';
 import { OrderEmailWorker } from './order-email-worker.service';
 import { ReservationWorker } from './reservation-worker.service';
 import { Module } from '@nestjs/common';
@@ -25,7 +27,7 @@ import { RolesGuard } from '../auth/roles.guard';
 
 @Module({
   imports: [AuthModule],
-  controllers: [CatalogController, CatalogPublicController, AdminOrdersController, AdminCustomersController, CustomerAccountController, AdminDashboardController, AdminCommerceSettingsController],
-  providers: [OrderEmailWorker, ReservationWorker, CatalogService, PublicCatalogService, PublicCartService, PublicCheckoutService, OrderEmailService, MercadoPagoService, AdminOrdersService, AdminCustomersService, CustomerAccountService, AdminDashboardService, AdminCommerceSettingsService, AuthGuard, RolesGuard],
+  controllers: [MpConnectionController, CatalogController, CatalogPublicController, AdminOrdersController, AdminCustomersController, CustomerAccountController, AdminDashboardController, AdminCommerceSettingsController],
+  providers: [MpConnectionService, OrderEmailWorker, ReservationWorker, CatalogService, PublicCatalogService, PublicCartService, PublicCheckoutService, OrderEmailService, MercadoPagoService, AdminOrdersService, AdminCustomersService, CustomerAccountService, AdminDashboardService, AdminCommerceSettingsService, AuthGuard, RolesGuard],
 })
 export class CatalogModule {}
