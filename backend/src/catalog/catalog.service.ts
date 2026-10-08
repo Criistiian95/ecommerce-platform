@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { Op } from 'sequelize';
 import { Category } from '../database/models/category.model';
 import { Product } from '../database/models/product.model';
+import { Commerce } from '../database/models/commerce.model';
 import { StockMovement } from '../database/models/stock-movement.model';
 
 @Injectable()
@@ -258,10 +259,12 @@ export class CatalogService {
   }
 
   async getProductImage(productId: string) {
-    const product = await Product.findByPk(productId, {
-      attributes: ['id', 'imageData', 'imageMimeType'],
+    const product = await Product.findOne({
+      where: { id: productId, active: true, published: true },
+      attributes: ['id', 'commerceId', 'imageData', 'imageMimeType'],
     });
-    if (!product?.imageData || !product.imageMimeType) {
+    const commerce = product ? await Commerce.findOne({ where: { id: product.commerceId, active: true }, attributes: ['id'] }) : null;
+    if (!commerce || !product?.imageData || !product.imageMimeType) {
       throw new NotFoundException('Imagen no encontrada');
     }
     return {
