@@ -7,6 +7,7 @@ import {
 import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { Session } from '../database/models/session.model';
+import { User } from '../database/models/user.model';
 
 export type AuthenticatedRequest = Request & {
   auth?: {
@@ -33,9 +34,14 @@ export class AuthGuard implements CanActivate {
       const payload = this.authService.verifyToken(token);
       const session = await Session.findByPk(payload.sid);
 
-      if (!session || session.revokedAt || session.expiresAt < new Date()) {
+      if (!session || session.revokedAt || session.expiresAt < new Date() || session.userId !== payload.sub) {
         throw new UnauthorizedException('Sesión inválida');
       }
+      const user = await User.findOne({
+        where: { id: payload.sub, active: true, role: payload.role, commerceId: payload.commerceId },
+        attributes: ['id'],
+      });
+      if (!user) throw new UnauthorizedException('Sesión inválida');
 
       request.auth = {
         userId: payload.sub,
