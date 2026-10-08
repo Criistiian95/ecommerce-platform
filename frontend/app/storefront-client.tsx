@@ -7,7 +7,7 @@ import StoreProductCard from './store-product-card';
 import {API_URL,StoreCatalog} from './storefront-types';
 import { useStorefront } from './storefront-context';
 
-export default function StorefrontClient(){
+export default function StorefrontClient({demoMode=false}:{demoMode?:boolean}){
   const { slug: COMMERCE_SLUG } = useStorefront();
   const {totalItems}=useCart();
   const {user}=useCustomerAuth();
@@ -39,7 +39,7 @@ export default function StorefrontClient(){
   } as CSSProperties;
   const products=(catalog?.products??[]).filter(p=>(!category||p.category?.id===category)&&(!offers||(p.offerPrice!==null&&p.offerPrice!==undefined&&Number(p.offerPrice)<Number(p.price)))&&normalize(`${p.name} ${p.brand??''} ${p.category?.name??''}`).includes(normalize(query.trim()))).sort((a,b)=>sort==='low'?Number(a.offerPrice??a.price)-Number(b.offerPrice??b.price):sort==='high'?Number(b.offerPrice??b.price)-Number(a.offerPrice??a.price):sort==='name'?a.name.localeCompare(b.name,'es'):Number(b.featured)-Number(a.featured));
   return <div className="commerce-theme" style={themeStyle}>
-    <div className="store-announcement">{brandName.toUpperCase()} · TIENDA ONLINE</div>
+    <div className="store-announcement">{demoMode?'DEMO INTERACTIVA · RECORRÉ LA TIENDA COMO CLIENTE':`${brandName.toUpperCase()} · TIENDA ONLINE`}</div>
     <header className="store-header">
       <Link href="/tienda" className="store-identity">{logoSrc?<img className="store-logo" src={logoSrc} alt={brandName}/>:<span className="store-monogram" aria-hidden="true">{brandName.charAt(0).toUpperCase()}</span>}<div><div className="store-brand">{brandName}</div><small>{tagline}</small></div></Link>
       <div className="store-header-actions"><a className="store-nav-link" href="#catalogo">Explorar catálogo</a><Link className="store-nav-link" href={user?'/mi-cuenta':'/cliente/login'}>{user?'Mi cuenta':'Ingresar'}</Link><Link className="btn primary" href="/carrito">Carrito <span className="cart-count">{totalItems}</span></Link></div>
