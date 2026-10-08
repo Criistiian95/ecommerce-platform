@@ -1,14 +1,15 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '../store-link';
 import { CSSProperties, FormEvent, useEffect, useRef, useState } from 'react';
 import { useCart } from '../cart-context';
 import { useCustomerAuth } from '../customer-auth-context';
 import { API_URL, StoreCatalog } from '../storefront-types';
-import { COMMERCE_SLUG } from '../storefront-config';
+import { useStorefront } from '../storefront-context';
 import '../tienda/store.module.css';
 
 export default function CheckoutPage() {
+  const { slug: COMMERCE_SLUG } = useStorefront();
   const { items, subtotal } = useCart();
   const { user, token } = useCustomerAuth();
   const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'shipping'>('pickup');
@@ -86,7 +87,7 @@ export default function CheckoutPage() {
       if (!response.ok) {
         if (data?.orderId) {
           setPendingOrderId(data.orderId);
-          localStorage.setItem('last_pending_order', data.orderId);
+          localStorage.setItem(`last_pending_order:${COMMERCE_SLUG}`, data.orderId);
         }
         if (data?.code === 'CHECKOUT_CLOSED') localStorage.removeItem(storageKey);
         setMessage(data?.message ?? 'No se pudo crear el pedido.');
@@ -99,7 +100,7 @@ export default function CheckoutPage() {
         return;
       }
 
-      localStorage.setItem('last_pending_order', data.order.id);
+      localStorage.setItem(`last_pending_order:${COMMERCE_SLUG}`, data.order.id);
       window.location.assign(checkoutUrl);
     } catch {
       setMessage('No se pudo conectar con el servidor.');

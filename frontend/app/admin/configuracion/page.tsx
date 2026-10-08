@@ -1,4 +1,5 @@
 'use client';
+import AdminStoreLink from '../store-link';
 
 import Link from 'next/link';
 import Payments from './payments';
@@ -45,6 +46,7 @@ async function fileToBase64(file:File){
 }
 
 export default function CommerceSettingsPage(){
+  const [origin, setOrigin] = useState('');
   const [token,setToken]=useState('');
   const [settings,setSettings]=useState<Settings|null>(null);
   const [saving,setSaving]=useState(false);
@@ -56,6 +58,7 @@ export default function CommerceSettingsPage(){
   const [previewSecondary,setPreviewSecondary]=useState('#172238');
 
   useEffect(()=>{
+    setOrigin(window.location.origin);
     const saved=localStorage.getItem('ecommerce_token') ?? '';
     setToken(saved);
     if(saved) void load(saved);
@@ -172,7 +175,7 @@ export default function CommerceSettingsPage(){
           <Link className="admin-nav-link" href="/admin/pedidos">Pedidos</Link>
           <Link className="admin-nav-link" href="/admin/clientes">Clientes</Link>
           <Link className="admin-nav-link active" href="/admin/configuracion">Configuración</Link>
-          <Link className="admin-store-link" href="/">↗ Ver tienda</Link>
+          <AdminStoreLink />
         </nav>
       </header>
 
@@ -184,6 +187,15 @@ export default function CommerceSettingsPage(){
         </div>
       </section>
 
+      {settings && <section className="card settings-card" style={{ marginBottom: 24 }}>
+        <h2>Enlace de tu tienda</h2>
+        <p>Compartí este enlace con tus clientes para que visiten tu comercio.</p>
+        <input aria-label="Enlace de tu tienda" readOnly value={`${origin}/tienda/${encodeURIComponent(settings.slug)}`} style={{ width: '100%', marginBottom: 12 }} onFocus={event => event.currentTarget.select()} />
+        <button type="button" className="btn secondary" onClick={async () => {
+          try { await navigator.clipboard.writeText(`${origin}/tienda/${encodeURIComponent(settings.slug)}`); setMessageType('success'); setMessage('Enlace copiado.'); }
+          catch { setMessageType('error'); setMessage('Seleccioná el enlace y copialo con Ctrl + C.'); }
+        }}>Copiar enlace</button>
+      </section>}
       <Payments token={token} />
 
       {message && <div className={messageType==='success'?'settings-message success':'settings-message error'}>{message}</div>}

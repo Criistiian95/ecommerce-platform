@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '../store-link';
 import { useState } from 'react';
 import { useCart } from '../cart-context';
 import { API_URL } from '../storefront-types';

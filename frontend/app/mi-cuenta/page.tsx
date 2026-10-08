@@ -1,6 +1,7 @@
 'use client';
 
-import Link from 'next/link';
+import { useStorefront } from '../storefront-context';
+import Link from '../store-link';
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCustomerAuth } from '../customer-auth-context';
@@ -39,12 +40,13 @@ const paymentLabels:Record<string,string>={
 export default function CustomerAccountPage(){
   const { user,token,loading,updateProfile,logout } = useCustomerAuth();
   const router = useRouter();
+  const { path } = useStorefront();
   const [orders,setOrders] = useState<CustomerOrder[]>([]);
   const [message,setMessage] = useState('');
   const [saving,setSaving] = useState(false);
 
   useEffect(()=>{
-    if (!loading && !user) router.replace('/cliente/login?next=/mi-cuenta');
+    if (!loading && !user) router.replace(path('/cliente/login?next=/mi-cuenta'));
   },[loading,user,router]);
 
   useEffect(()=>{
@@ -92,7 +94,7 @@ export default function CustomerAccountPage(){
             <h1>Hola, {user.name.split(' ')[0]}</h1>
             <p>Administrá tus datos y consultá tus compras.</p>
           </div>
-          <button className="btn secondary" onClick={()=>{void logout();router.push('/tienda');}}>Cerrar sesión</button>
+          <button className="btn secondary" onClick={()=>{void logout();router.push(path('/tienda'));}}>Cerrar sesión</button>
         </header>
 
         {message && <div className={message.includes('correctamente')?styles.success:styles.alert}>{message}</div>}

@@ -1,10 +1,10 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '../../store-link';
 import { useEffect, useState } from 'react';
 import { useCart } from '../../cart-context';
 import { API_URL } from '../../storefront-types';
-import { COMMERCE_SLUG } from '../../storefront-config';
+import { useStorefront } from '../../storefront-context';
 import '../../tienda/store.module.css';
 
 type PaymentStatus = {
@@ -20,6 +20,7 @@ type PaymentStatus = {
 };
 
 export default function PaymentResultPage() {
+  const { slug: COMMERCE_SLUG } = useStorefront();
   const { clearCart } = useCart();
   const [status, setStatus] = useState<PaymentStatus | null>(null);
   const [message, setMessage] = useState('Verificando el pago...');
@@ -44,7 +45,7 @@ export default function PaymentResultPage() {
         setMessage('Recibimos el pago, pero el pedido requiere revisión del comercio. Comunicate indicando el número de pedido.');
       } else if (data.paymentStatus === 'paid') {
         clearCart();
-        localStorage.removeItem('last_pending_order');
+        localStorage.removeItem(`last_pending_order:${COMMERCE_SLUG}`);
         setMessage('Pago aprobado.');
       } else if (data.paymentStatus === 'pending') {
         setMessage('El pago todavía está pendiente de confirmación.');
@@ -63,7 +64,7 @@ export default function PaymentResultPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const id = params.get('order') || localStorage.getItem('last_pending_order') || '';
+    const id = params.get('order') || localStorage.getItem(`last_pending_order:${COMMERCE_SLUG}`) || '';
     setOrderId(id);
 
     if (!id) {
