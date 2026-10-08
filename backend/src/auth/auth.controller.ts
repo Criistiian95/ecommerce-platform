@@ -23,8 +23,8 @@ export class AuthController {
   }
 
   @Post('login')
-  login(@Body() body: { email: string; password: string }) {
-    return this.auth.login(body.email?.trim().toLowerCase(), body.password);
+  login(@Body() body: { email: string; password: string; commerceSlug?: string }) {
+    return this.auth.login(body.email?.trim().toLowerCase(), body.password, body.commerceSlug);
   }
 
 
