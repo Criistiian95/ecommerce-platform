@@ -1,5 +1,11 @@
 name: Checkout and stock
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/checkout-tests.yml'
   pull_request:
     paths:
       - 'backend/**'
