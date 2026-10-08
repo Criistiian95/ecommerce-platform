@@ -3,7 +3,6 @@ import { tenantSlugFromHost, STOREFRONT_DOMAIN } from './app/tenant-host';
 
 const SHOP_ROUTES = /^\/(?:producto|carrito|checkout|cliente|mi-cuenta|pago)(?:\/|$)/;
 const ADMIN_ROUTES = /^\/(?:admin|login|setup)(?:\/|$)/;
-const RESERVED_HOSTS = new Set(['www','admin','api','app','dashboard','mail','demo']);
 
 export function proxy(request: NextRequest) {
   const host = request.headers.get('host') || '';
