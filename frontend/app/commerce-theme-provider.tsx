@@ -2,9 +2,10 @@
 
 import { useEffect } from 'react';
 import { API_URL, StoreCatalog } from './storefront-types';
-import { COMMERCE_SLUG } from './storefront-config';
+import { useStorefront } from './storefront-context';
 
 export function CommerceThemeProvider({ children }:{ children:React.ReactNode }){
+  const { slug: COMMERCE_SLUG } = useStorefront();
   useEffect(()=>{
     const controller=new AbortController();
 

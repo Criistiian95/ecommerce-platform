@@ -1,7 +1,5 @@
 import './globals.css';
-import { CartProvider } from './cart-context';
-import { CustomerAuthProvider } from './customer-auth-context';
-import { CommerceThemeProvider } from './commerce-theme-provider';
+import { StorefrontProvider } from './storefront-context';
 
 export const metadata = {
   title: 'Tienda Demo',
@@ -11,7 +9,7 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
-      <body><CommerceThemeProvider><CustomerAuthProvider><CartProvider>{children}</CartProvider></CustomerAuthProvider></CommerceThemeProvider></body>
+      <body><StorefrontProvider>{children}</StorefrontProvider></body>
     </html>
   );
 }

@@ -2,7 +2,8 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { API_URL, StoreProduct } from './storefront-types';
-import { COMMERCE_SLUG } from './storefront-config';
+import { storeStorageKey } from './storefront-routing';
+import { useStorefront } from './storefront-context';
 
 type CartItem = {
   product: StoreProduct;
@@ -20,9 +21,9 @@ type CartContextValue = {
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
-const STORAGE_KEY = 'ecommerce_cart_v1';
 
-async function validate(items: Array<{ productId: string; quantity: number }>) {
+
+async function validate(COMMERCE_SLUG: string, items: Array<{ productId: string; quantity: number }>) {
   const response = await fetch(`${API_URL}/catalog/store/${COMMERCE_SLUG}/cart/validate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -34,6 +35,9 @@ async function validate(items: Array<{ productId: string; quantity: number }>) {
 }
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
+  const { slug: COMMERCE_SLUG } = useStorefront();
+  const STORAGE_KEY = storeStorageKey('ecommerce_cart_v2', COMMERCE_SLUG);
+  const [ready, setReady] = useState(false);
   const [items, setItems] = useState<CartItem[]>([]);
 
   useEffect(() => {
@@ -41,16 +45,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) setItems(JSON.parse(saved));
     } catch {}
+    setReady(true);
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-  }, [items]);
+    if (ready) localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  }, [items, ready]);
 
   async function addProduct(product: StoreProduct) {
     const existing = items.find(item => item.product.id === product.id);
     const quantity = (existing?.quantity ?? 0) + 1;
-    const validation = await validate([{ productId: product.id, quantity }]);
+    const validation = await validate(COMMERCE_SLUG, [{ productId: product.id, quantity }]);
 
     if (!validation.valid) {
       return { ok: false, message: 'No hay disponibilidad para agregar más unidades.' };
@@ -77,7 +82,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return { ok: true };
     }
 
-    const validation = await validate([{ productId, quantity }]);
+    const validation = await validate(COMMERCE_SLUG, [{ productId, quantity }]);
     if (!validation.valid) {
       return { ok: false, message: 'No hay disponibilidad para esa cantidad.' };
     }

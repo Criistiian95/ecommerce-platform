@@ -1,14 +1,15 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '../../store-link';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useCart } from '../../cart-context';
 import { API_URL, StoreProduct } from '../../storefront-types';
-import { COMMERCE_SLUG } from '../../storefront-config';
+import { useStorefront } from '../../storefront-context';
 import '../../tienda/store.module.css';
 
 export default function ProductDetailPage() {
+  const { slug: COMMERCE_SLUG } = useStorefront();
   const params = useParams<{ id: string }>();
   const { addProduct } = useCart();
   const [product, setProduct] = useState<StoreProduct | null>(null);

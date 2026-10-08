@@ -1,13 +1,14 @@
 'use client';
 import {CSSProperties,useEffect,useState} from 'react';
-import Link from 'next/link';
+import Link from './store-link';
 import {useCart} from './cart-context';
 import {useCustomerAuth} from './customer-auth-context';
 import StoreProductCard from './store-product-card';
 import {API_URL,StoreCatalog} from './storefront-types';
-import {COMMERCE_SLUG} from './storefront-config';
+import { useStorefront } from './storefront-context';
 
 export default function StorefrontClient(){
+  const { slug: COMMERCE_SLUG } = useStorefront();
   const {totalItems}=useCart();
   const {user}=useCustomerAuth();
   const [catalog,setCatalog]=useState<StoreCatalog|null>(null);

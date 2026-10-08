@@ -2,7 +2,8 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { API_URL } from './storefront-types';
-import { COMMERCE_SLUG } from './storefront-config';
+import { storeStorageKey } from './storefront-routing';
+import { useStorefront } from './storefront-context';
 
 export type CustomerUser = {
   id: string;
@@ -37,9 +38,11 @@ type CustomerAuthValue = {
 };
 
 const CustomerAuthContext = createContext<CustomerAuthValue | null>(null);
-const TOKEN_KEY = 'ecommerce_customer_token';
+
 
 export function CustomerAuthProvider({ children }: { children: React.ReactNode }) {
+  const { slug: COMMERCE_SLUG } = useStorefront();
+  const TOKEN_KEY = storeStorageKey('ecommerce_customer_token', COMMERCE_SLUG);
   const [user, setUser] = useState<CustomerUser | null>(null);
   const [token, setToken] = useState('');
   const [loading, setLoading] = useState(true);

@@ -61,6 +61,9 @@ export class MercadoPagoService {
     const { token } = await this.orderCredentials(order);
     const frontendUrl = (process.env.FRONTEND_URL ?? '').replace(/\/$/, '');
     if (!frontendUrl) throw new Error('FRONTEND_URL is not configured');
+    const commerce = await Commerce.findByPk(order.commerceId, { attributes: ['slug'] });
+    if (!commerce?.slug) throw new Error('Order commerce not found');
+    const resultUrl = `${frontendUrl}/tienda/${encodeURIComponent(commerce.slug)}/pago/resultado`;
 
     const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method: 'POST',
@@ -83,9 +86,9 @@ export class MercadoPagoService {
         external_reference: order.id,
         statement_descriptor: 'ECOMMERCE',
         back_urls: {
-          success: `${frontendUrl}/pago/resultado?result=success&order=${order.id}`,
-          failure: `${frontendUrl}/pago/resultado?result=failure&order=${order.id}`,
-          pending: `${frontendUrl}/pago/resultado?result=pending&order=${order.id}`,
+          success: `${resultUrl}?result=success&order=${order.id}`,
+          failure: `${resultUrl}?result=failure&order=${order.id}`,
+          pending: `${resultUrl}?result=pending&order=${order.id}`,
         },
         auto_return: 'approved',
         expires: true,

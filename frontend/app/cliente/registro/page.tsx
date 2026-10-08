@@ -1,6 +1,8 @@
 'use client';
 
-import Link from 'next/link';
+import { useStorefront } from '../../storefront-context';
+import { customerDestination } from '../../storefront-routing';
+import Link from '../../store-link';
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCustomerAuth } from '../../customer-auth-context';
@@ -9,6 +11,7 @@ import styles from '../customer.module.css';
 export default function CustomerRegisterPage() {
   const { register } = useCustomerAuth();
   const router = useRouter();
+  const { path } = useStorefront();
   const [message,setMessage] = useState('');
   const [saving,setSaving] = useState(false);
 
@@ -42,7 +45,7 @@ export default function CustomerRegisterPage() {
     }
 
     const next = new URLSearchParams(window.location.search).get('next');
-    router.push(next && next.startsWith('/') ? next : '/mi-cuenta');
+    router.push(path(customerDestination(next)));
   }
 
   return (

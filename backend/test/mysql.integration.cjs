@@ -243,3 +243,23 @@ test('MySQL OAuth: checkout without connection creates no order and reserves no 
   assert.equal(await Order.count({ where: { commerceId: f.commerce.id } }), 0);
   assert.equal((await f.product.reload()).currentStock, 10);
 });
+
+test('MySQL store links: catalog, detail and cart remain isolated by commerce slug', async () => {
+  const { PublicCatalogService } = require('../dist/catalog/public-catalog.service');
+  const { PublicCartService } = require('../dist/catalog/public-cart.service');
+  const a = await fixture(), b = await fixture();
+  await a.product.update({ published: true, active: true });
+  await b.product.update({ published: true, active: true });
+  const catalog = new PublicCatalogService(), cart = new PublicCartService();
+  for (const [own, other] of [[a, b], [b, a]]) {
+    const result = await catalog.getCatalog(own.commerce.slug);
+    assert.deepEqual(result.products.map(p => p.id), [own.product.id]);
+    assert.equal((await cart.getProduct(own.commerce.slug, own.product.id)).id, own.product.id);
+    await assert.rejects(cart.getProduct(own.commerce.slug, other.product.id), /Producto no encontrado/);
+    assert.equal((await cart.validateCart(own.commerce.slug, [{ productId: other.product.id, quantity: 1 }])).valid, false);
+    assert.equal((await own.checkout.createOrder(own.commerce.slug, { ...own.request, items: [{ productId: other.product.id, quantity: 1 }] }).then(() => true, () => false)), false);
+  }
+  await b.commerce.update({ active: false });
+  await assert.rejects(catalog.getCatalog(b.commerce.slug), /Comercio no encontrado/);
+  await assert.rejects(catalog.getCatalog(randomUUID()), /Comercio no encontrado/);
+});
