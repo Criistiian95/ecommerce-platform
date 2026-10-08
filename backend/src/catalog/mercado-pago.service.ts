@@ -63,7 +63,12 @@ export class MercadoPagoService {
     if (!frontendUrl) throw new Error('FRONTEND_URL is not configured');
     const commerce = await Commerce.findByPk(order.commerceId, { attributes: ['slug'] });
     if (!commerce?.slug) throw new Error('Order commerce not found');
-    const resultUrl = `${frontendUrl}/tienda/${encodeURIComponent(commerce.slug)}/pago/resultado`;
+    const merchantDomain = process.env.MERCHANT_RETURN_DOMAIN?.trim().toLowerCase();
+    const usableMerchantHost = merchantDomain && /^[a-z0-9.-]+$/.test(merchantDomain) &&
+      /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(commerce.slug);
+    const resultUrl = usableMerchantHost
+      ? `https://${commerce.slug}.${merchantDomain}/pago/resultado`
+      : `${frontendUrl}/tienda/${encodeURIComponent(commerce.slug)}/pago/resultado`;
 
     const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method: 'POST',
