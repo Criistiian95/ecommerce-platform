@@ -29,3 +29,21 @@ test('cart and customer sessions have distinct storage keys per commerce', () =>
     assert.notEqual(storeStorageKey(kind, 'a'), storeStorageKey(kind, 'b'));
   }
 });
+
+test('merchant domains use clean URLs and never inherit another store slug', () => {
+  assert.equal(storePath('almacen-a', '/carrito', true), '/carrito');
+  assert.equal(storePath('almacen-a', '/checkout', true), '/checkout');
+  assert.equal(storePath('almacen-a', '/tienda', true), '/');
+  assert.equal(storePath('almacen-a', '/admin/dashboard', true), '/admin/dashboard');
+});
+const tenantModule = ts.transpileModule(fs.readFileSync(require.resolve('../app/tenant-host.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+const tenantSandbox = { exports: {}, process: { env: {} } };
+vm.runInNewContext(tenantModule, tenantSandbox);
+const { tenantSlugFromHost } = tenantSandbox.exports;
+test('single-level merchant subdomains resolve only under Diseñolys', () => {
+  assert.equal(tenantSlugFromHost('libreria.disenolys.store'), 'libreria');
+  assert.equal(tenantSlugFromHost('MODA-URBANA.disenolys.store:443'), 'moda-urbana');
+  for (const host of ['www.disenolys.store','admin.disenolys.store','disenolys.store','foo.bar.disenolys.store','other.example.com','evil-diseno.disenolys.store.evil.com','foo..disenolys.store']) {
+    assert.equal(tenantSlugFromHost(host), null);
+  }
+});
