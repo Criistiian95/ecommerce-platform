@@ -2,10 +2,12 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useStorefront } from '../storefront-context';
 
 export default function LoginPage() {
   const [message, setMessage] = useState('');
   const router = useRouter();
+  const { slug, isTenantDomain } = useStorefront();
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -19,6 +21,7 @@ export default function LoginPage() {
         body: JSON.stringify({
           email: form.get('email'),
           password: form.get('password'),
+          ...(isTenantDomain ? { commerceSlug: slug } : {}),
         }),
       },
     );
