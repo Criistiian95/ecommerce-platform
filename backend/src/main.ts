@@ -20,8 +20,24 @@ async function bootstrap() {
     .map((origin) => origin.trim())
     .filter(Boolean);
 
+  // Permit merchant storefronts on authenticated, single-label Diseñolys subdomains.
+  // Never use the unrestricted wildcard origin with credentials.
+  const tenantDomain = (process.env.STOREFRONT_DOMAIN || 'disenolys.store').toLowerCase();
+  const tenantOrigin = new RegExp('^https://[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.' + tenantDomain.replace(/\./g, '\\.') + '
+
+  await app.listen(Number(process.env.PORT ?? 3003));
+}
+
+void bootstrap();
+);
   app.enableCors({
-    origin: allowedOrigins,
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin) || tenantOrigin.test(origin)) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
     credentials: true,
   });
 
