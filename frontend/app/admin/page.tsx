@@ -18,6 +18,7 @@ type Product = {
   imageUrl?: string | null;
   description?: string | null;
   hasUploadedImage?: boolean;
+  updatedAt?: string;
   active: boolean;
   categoryId?: string | null;
   category?: { id?: string; name?: string } | null;
@@ -392,7 +393,7 @@ export default function AdminPage() {
             </div>
             <button className="btn secondary" onClick={() => setEditing(null)}>Cancelar</button>
           </div>
-          <form onSubmit={saveProduct}>
+          <form key={editing.id} onSubmit={saveProduct}>
             <div className="admin-grid">
               <label className="field">SKU<input name="sku" defaultValue={editing.sku} required /></label>
               <label className="field">Nombre<input name="name" defaultValue={editing.name} required /></label>
@@ -446,7 +447,7 @@ export default function AdminPage() {
                     <td>
                       <div className="product-cell">
                         {product.hasUploadedImage ? (
-                          <img src={`${API}/catalog/products/${product.id}/image`} alt={product.name} className="product-thumb" />
+                          <img src={`${API}/catalog/products/${product.id}/image?v=${encodeURIComponent(product.updatedAt ?? "current")}`} alt={product.name} className="product-thumb" />
                         ) : product.imageUrl ? (
                           <img src={product.imageUrl} alt={product.name} className="product-thumb" />
                         ) : (

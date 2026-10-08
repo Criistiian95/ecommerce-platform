@@ -37,7 +37,7 @@ export default function CartPage() {
           <section className="cart-list">
             {items.map(item => {
               const image = item.product.hasUploadedImage
-                ? `${API_URL}/catalog/products/${item.product.id}/image`
+                ? `${API_URL}/catalog/products/${item.product.id}/image?v=${encodeURIComponent(item.product.updatedAt ?? "current")}`
                 : item.product.imageUrl || null;
               const unitPrice = Number(item.product.offerPrice ?? item.product.price);
 

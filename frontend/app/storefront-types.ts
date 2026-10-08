@@ -12,6 +12,7 @@ export type StoreProduct = {
   offerPrice?: string | null;
   imageUrl?: string | null;
   hasUploadedImage?: boolean;
+  updatedAt?: string;
   featured: boolean;
   available: boolean;
   category?: StoreCategory | null;

@@ -26,6 +26,7 @@ export class PublicCartService {
       price: plain.price,
       offerPrice: plain.offerPrice,
       imageUrl: plain.imageUrl,
+      updatedAt: plain.updatedAt,
       hasUploadedImage: Boolean(plain.hasUploadedImage),
       featured: Boolean(plain.featured),
       available: Number(plain.currentStock) > 0,
@@ -46,7 +47,7 @@ export class PublicCartService {
       },
       attributes: [
         'id','name','description','brand','price','offerPrice',
-        'imageUrl','featured','currentStock',
+        'imageUrl','updatedAt','featured','currentStock',
         [Product.sequelize!.literal('(image_data IS NOT NULL)'), 'hasUploadedImage'],
       ],
       include: [{

@@ -113,7 +113,7 @@ export class CatalogPublicController {
   async productImage(@Param('id') id: string, @Res() res: Response) {
     const image = await this.catalog.getProductImage(id);
     res.setHeader('Content-Type', image.mimeType);
-    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Cache-Control', 'public, no-cache');
     res.send(image.data);
   }
 }
