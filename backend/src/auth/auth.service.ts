@@ -51,20 +51,25 @@ export class AuthService {
     };
   }
 
-  async login(email: string, password: string) {
-    const user = await User.findOne({
+  async login(email: string, password: string, commerceSlug?: string) {
+    const slug = commerceSlug?.trim().toLowerCase();
+    const commerce = slug ? await Commerce.findOne({ where: { slug, active: true }, attributes: ['id'] }) : null;
+    if (slug && !commerce) throw new UnauthorizedException('Credenciales inválidas');
+    const users = await User.findAll({
       where: {
-        email,
-        active: true,
+        email, active: true,
         role: { [Op.in]: ['admin', 'superadmin', 'operator'] },
+        ...(commerce ? { commerceId: commerce.id } : {}),
       },
+      limit: 30,
     });
-    if (!user) throw new UnauthorizedException('Credenciales inválidas');
-
-    const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) throw new UnauthorizedException('Credenciales inválidas');
-
-    return this.createSession(user);
+    if (!password || !users.length) throw new UnauthorizedException('Credenciales inválidas');
+    for (const user of users) {
+      if (await bcrypt.compare(password, user.passwordHash)) {
+        return this.createSession(user);
+      }
+    }
+    throw new UnauthorizedException('Credenciales inválidas');
   }
 
   async registerCustomer(input: {
