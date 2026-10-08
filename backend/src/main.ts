@@ -15,9 +15,10 @@ async function bootstrap() {
   app.use(json({ limit: '4mb' }));
   app.use(urlencoded({ extended: true, limit: '4mb' }));
 
-  const allowedOrigins = (process.env.FRONTEND_URL ?? 'http://localhost:3000')
+  const allowedOrigins = (process.env.CORS_ORIGINS ?? process.env.FRONTEND_URL ?? 'http://localhost:3000')
     .split(',')
-    .map((origin) => origin.trim());
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 
   app.enableCors({
     origin: allowedOrigins,
