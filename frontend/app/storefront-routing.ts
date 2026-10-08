@@ -1,4 +1,5 @@
-export function storePath(slug: string | undefined, href: string): string {
+export function storePath(slug: string | undefined, href: string, cleanDomain = false): string {
+  if (cleanDomain) return href === '/tienda' ? '/' : href;
   if (!slug) return href;
   const prefix = `/tienda/${encodeURIComponent(slug)}`;
   if (href === '/tienda') return prefix;
