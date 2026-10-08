@@ -249,7 +249,7 @@ export class CatalogService {
       ...(!uploadedImage && input.imageUrl !== undefined
         ? { imageUrl: input.imageUrl?.trim() || null }
         : {}),
-      ...(input.clearUploadedImage
+      ...(!uploadedImage && (input.clearUploadedImage || Boolean(input.imageUrl?.trim()))
         ? { imageData: null, imageMimeType: null }
         : {}),
     });

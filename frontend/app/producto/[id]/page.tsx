@@ -28,7 +28,7 @@ export default function ProductDetailPage() {
   }
 
   const image = product.hasUploadedImage
-    ? `${API_URL}/catalog/products/${product.id}/image`
+    ? `${API_URL}/catalog/products/${product.id}/image?v=${encodeURIComponent(product.updatedAt ?? "current")}`
     : product.imageUrl || null;
 
   async function add() {

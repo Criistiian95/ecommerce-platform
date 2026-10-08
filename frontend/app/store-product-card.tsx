@@ -11,7 +11,7 @@ export default function StoreProductCard({ product }: { product: StoreProduct })
   const [adding, setAdding] = useState(false);
   const [failedImage, setFailedImage] = useState(false);
   const image = product.hasUploadedImage
-    ? `${API_URL}/catalog/products/${product.id}/image`
+    ? `${API_URL}/catalog/products/${product.id}/image?v=${encodeURIComponent(product.updatedAt ?? "current")}`
     : product.imageUrl || null;
 
   async function add() {
