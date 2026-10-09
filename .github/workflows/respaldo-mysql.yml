@@ -1,0 +1,51 @@
+name: Respaldo cifrado ecommerce
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 04:37 Argentina (UTC-3). GitHub puede demorar las ejecuciones.
+    - cron: '37 7 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ecommerce-mysql-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    if: github.repository == 'Criistiian95/ecommerce-platform' && vars.BACKUP_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Comprobar configuración
+        env:
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+        run: |
+          if [ -z "$BACKUP_DATABASE_URL" ]; then
+            echo '::error::Respaldo NO ACTIVADO: falta el secreto BACKUP_DATABASE_URL.'
+            exit 1
+          fi
+      - name: Preparar cliente MySQL
+        run: docker pull mysql:8.4
+      - name: Copiar y cifrar
+        env:
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+        run: python3 ops/backup/backup.py create
+      - name: Guardar únicamente archivos cifrados
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ecommerce-cifrado-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            backup-output/*.cms
+            backup-output/*.sha256
+          retention-days: 7
+          compression-level: 0
+          if-no-files-found: error
+      - name: Confirmar resultado
+        run: echo 'Copia cifrada guardada. Retención de 7 días; descargar antes de su vencimiento.' >> "$GITHUB_STEP_SUMMARY"
+
