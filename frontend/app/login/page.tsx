@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStorefront } from '../storefront-context';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const [message, setMessage] = useState('');
@@ -57,6 +58,7 @@ export default function LoginPage() {
         </label>
         <button className="btn primary" type="submit">Ingresar</button>
       </form>
+      <p><Link href="/recuperar">Olvidé mi contraseña</Link></p>
       {message && <p>{message}</p>}
     </main>
   );

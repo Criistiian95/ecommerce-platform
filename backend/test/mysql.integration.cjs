@@ -49,7 +49,7 @@ test('MySQL: versioned legacy upgrade is repeatable and startup is read-only', a
   await db.onModuleInit();
   assert.equal(statements.some(sql => /ALTER|CREATE|DROP/i.test(sql)), false);
   const [versions] = await original('SELECT version FROM schema_migrations');
-  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding', '006_commerce_payments']);
+  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding', '006_commerce_payments', '007_password_recovery']);
   const [indexes] = await db.sequelize.query("SHOW INDEX FROM orders WHERE Column_name = 'checkout_key'");
   assert.ok(indexes.some(index => index.Non_unique === 0));
 });
@@ -262,4 +262,108 @@ test('MySQL store links: catalog, detail and cart remain isolated by commerce sl
   await b.commerce.update({ active: false });
   await assert.rejects(catalog.getCatalog(b.commerce.slug), /Comercio no encontrado/);
   await assert.rejects(catalog.getCatalog(randomUUID()), /Comercio no encontrado/);
+});
+
+const { PasswordRecoveryService } = require('../dist/auth/password-recovery.service');
+const { Session } = require('../dist/database/models/session.model');
+const bcrypt = require('bcryptjs');
+function recoveryService() {
+  process.env.FRONTEND_URL = 'https://shop.example';
+  process.env.RESEND_API_KEY = 'test-only';
+  process.env.ORDER_EMAIL_FROM = 'test@example.invalid';
+  const service = new PasswordRecoveryService(db), messages = [];
+  mock.method(service, 'send', async (to, subject, text) => { messages.push({ to, subject, text }); });
+  mock.method(service, 'drain', async () => {});
+  return { service, messages };
+}
+async function recoveryFixture() {
+  const f = await fixture();
+  await f.user.update({ passwordHash: await bcrypt.hash('old-password-for-test', 4) });
+  await Session.create({ id: randomUUID(), userId: f.user.id, expiresAt: new Date(Date.now()+3600000) });
+  return f;
+}
+function requestScope(f, audience='admin') { return { email: f.user.email, slug: f.commerce.slug, audience }; }
+async function link(service, messages, f, audience='admin') {
+  await service.issue(requestScope(f, audience));
+  return messages.at(-1).text.match(/#token=([a-f0-9]{64})/)[1];
+}
+function resetBody(f, token, audience='admin') {
+  return { token, commerceSlug: f.commerce.slug, audience, password: 'a new safe password 123', confirmPassword: 'a new safe password 123' };
+}
+test('MySQL recovery: hashed tokens, correct tenant and role, one concurrent use and all sessions revoked', async () => {
+  const f = await recoveryFixture(), other = await fixture(), { service, messages } = recoveryService();
+  const token = await link(service, messages, f);
+  const [rows] = await db.sequelize.query('SELECT * FROM password_reset_tokens WHERE user_id=?', { replacements:[f.user.id] });
+  assert.equal(rows[0].token_hash, createHash('sha256').update(token).digest('hex'));
+  assert.ok(!JSON.stringify(rows).includes(token));
+  const payload = resetBody(f, token), ip = randomUUID();
+  await assert.rejects(service.reset({ ...payload, commerceSlug: other.commerce.slug }, ip), /no es válido/);
+  await assert.rejects(service.reset({ ...payload, audience:'customer' }, ip), /no es válido/);
+  const results = await Promise.allSettled([service.reset(payload, ip), service.reset(payload, ip)]);
+  assert.equal(results.filter(x => x.status==='fulfilled').length, 1);
+  assert.ok(await bcrypt.compare(payload.password, (await f.user.reload()).passwordHash));
+  assert.equal(await Session.count({ where:{ userId:f.user.id, revokedAt:null } }), 0);
+  await assert.rejects(service.reset(payload, ip), /no es válido/);
+});
+test('MySQL recovery: expired, superseded, inactive and changed-password tokens cannot reset', async () => {
+  const f = await recoveryFixture(), { service, messages } = recoveryService(), ip = randomUUID();
+  const first = await link(service, messages, f), second = await link(service, messages, f);
+  await assert.rejects(service.reset(resetBody(f, first), ip), /no es válido/);
+  await db.sequelize.query('UPDATE password_reset_tokens SET expires_at=DATE_SUB(NOW(),INTERVAL 1 MINUTE) WHERE user_id=?', { replacements:[f.user.id] });
+  await assert.rejects(service.reset(resetBody(f, second), ip), /no es válido/);
+  const third = await link(service, messages, f);
+  await f.user.update({ active:false });
+  await assert.rejects(service.reset(resetBody(f, third), ip), /no es válido/);
+  await f.user.update({ active:true, passwordHash:await bcrypt.hash('another password',4) });
+  await assert.rejects(service.reset(resetBody(f, third), ip), /no es válido/);
+});
+test('MySQL recovery: unknown accounts have identical queued response, per-email limit survives service replacement', async () => {
+  const f=await fixture(), {service}=recoveryService(), ip=randomUUID();
+  const payload={ email:f.user.email, commerceSlug:f.commerce.slug, audience:'admin' };
+  const existing=await service.request(payload,ip);
+  const missing=await service.request({...payload,email:`${randomUUID()}@example.invalid`},ip);
+  assert.deepEqual(existing,missing);
+  await service.request(payload,ip); await service.request(payload,ip);
+  const replacement=new PasswordRecoveryService(db);
+  mock.method(replacement,'drain',async()=>{});
+  assert.deepEqual(await replacement.request(payload,ip),existing);
+  const [rows]=await db.sequelize.query('SELECT COUNT(*) AS n FROM password_reset_requests WHERE email=?',{replacements:[f.user.email]});
+  assert.equal(rows[0].n,3);
+  await new Promise(resolve=>setImmediate(resolve));
+});
+test('MySQL recovery: customer path works and overlong UTF-8 passwords or mismatches are rejected', async () => {
+  const f=await recoveryFixture(), {service,messages}=recoveryService(), ip=randomUUID();
+  await f.user.update({role:'customer'});
+  await service.issue(requestScope(f)); assert.equal(messages.length,0);
+  const token=await link(service,messages,f,'customer'), payload=resetBody(f,token,'customer');
+  await assert.rejects(service.reset({...payload,password:'🔐'.repeat(20),confirmPassword:'🔐'.repeat(20)},ip),/72 bytes/);
+  await assert.rejects(service.reset({...payload,confirmPassword:'different'},ip),/misma contraseña/);
+  await service.reset(payload,ip);
+  assert.ok(await bcrypt.compare(payload.password,(await f.user.reload()).passwordHash));
+});
+
+test('MySQL recovery: durable worker delivers without storing plaintext tokens and retries provider failure', async () => {
+  await db.sequelize.query('DELETE FROM password_reset_requests');
+  const f=await fixture(), service=new PasswordRecoveryService(db), id=randomUUID();
+  let fail=true; const messages=[];
+  mock.method(service,'send',async(to,subject,text)=>{ if(fail) throw new Error('provider'); messages.push(text); });
+  await db.sequelize.query(`INSERT INTO password_reset_requests(id,email,slug,audience,available_at,expires_at)
+    VALUES (?,?,?,'admin',NOW(),DATE_ADD(NOW(),INTERVAL 10 MINUTE))`,{replacements:[id,f.user.email,f.commerce.slug]});
+  await service.drain();
+  let [rows]=await db.sequelize.query('SELECT * FROM password_reset_requests WHERE id=?',{replacements:[id]});
+  assert.equal(rows.length,1); assert.equal(rows[0].attempts,1);
+  fail=false;
+  await db.sequelize.query('UPDATE password_reset_requests SET available_at=NOW() WHERE id=?',{replacements:[id]});
+  await service.drain();
+  [rows]=await db.sequelize.query('SELECT * FROM password_reset_requests WHERE id=?',{replacements:[id]});
+  assert.equal(rows.length,0); assert.equal(messages.length,1);
+  assert.match(messages[0],/https:\/\/shop.example\/recuperar#token=/);
+});
+test('MySQL recovery: a login checked before password reset cannot mint a session afterwards', async () => {
+  const {AuthService}=require('../dist/auth/auth.service');
+  const f=await recoveryFixture(), stale=await User.findByPk(f.user.id), {service,messages}=recoveryService();
+  const token=await link(service,messages,f);
+  await service.reset(resetBody(f,token),randomUUID());
+  await assert.rejects(new AuthService(db).createSession(stale),/Credenciales inválidas/);
+  assert.equal(await Session.count({where:{userId:f.user.id,revokedAt:null}}),0);
 });

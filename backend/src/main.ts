@@ -8,6 +8,7 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
   app.enableShutdownHooks();
+  app.use('/auth/password', json({ limit: '8kb' }));
   app.use(json({ limit: '4mb' }));
   app.use(urlencoded({ extended: true, limit: '4mb' }));
 

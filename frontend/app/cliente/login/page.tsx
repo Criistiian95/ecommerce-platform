@@ -61,6 +61,7 @@ export default function CustomerLoginPage() {
               {saving ? 'Ingresando...' : 'Ingresar'}
             </button>
           </form>
+          <p><Link href="/cliente/recuperar">Olvidé mi contraseña</Link></p>
 
           <div className={styles.authFooter}>
             <span>¿Todavía no tenés cuenta?</span>

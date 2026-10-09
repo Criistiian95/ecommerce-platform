@@ -2,9 +2,10 @@ import { createHash } from 'crypto';
 import { Sequelize, QueryTypes } from 'sequelize';
 import type { Connection } from 'mysql2';
 import { baseline } from './baseline';
+import { passwordRecoverySchema } from './password-recovery';
 
 type Query = (sql: string, values?: unknown[]) => Promise<any[]>;
-const versions = ['001_baseline', '002_legacy_checkout', '003_email_outbox', '004_customer_accounts', '005_commerce_branding', '006_commerce_payments'];
+const versions = ['001_baseline', '002_legacy_checkout', '003_email_outbox', '004_customer_accounts', '005_commerce_branding', '006_commerce_payments', '007_password_recovery'];
 async function legacy(query: Query) {
   const columns: Record<string, Record<string, string>> = {
     products: { image_data: 'MEDIUMBLOB NULL', image_mime_type: 'VARCHAR(60) NULL', brand: 'VARCHAR(120) NULL', cost: 'DECIMAL(14,2) NULL', offer_price: 'DECIMAL(14,2) NULL', published: 'TINYINT(1) NOT NULL DEFAULT 1', featured: 'TINYINT(1) NOT NULL DEFAULT 0' },
@@ -121,6 +122,9 @@ export async function runMigrations(sequelize: Sequelize) {
         ) ENGINE=InnoDB`);
         if (!(await query("SHOW COLUMNS FROM orders WHERE Field = 'mp_collector_id'")).length)
           await query('ALTER TABLE orders ADD COLUMN mp_collector_id VARCHAR(40) NULL');
+      }
+      if (version === '007_password_recovery') {
+        for (const sql of passwordRecoverySchema) await query(sql);
       }
       // DDL is not transactional in MySQL; every step above is safe to resume.
       await query('INSERT INTO schema_migrations (version, applied_at) VALUES (?, NOW())', [version]);
