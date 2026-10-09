@@ -1,0 +1,28 @@
+name: Verificar recuperación de respaldo
+on:
+  push:
+    branches: [main]
+    paths: ['ops/backup/**', '.github/workflows/verificar-respaldo.yml', '.github/workflows/respaldo-mysql.yml']
+  pull_request:
+    paths: ['ops/backup/**', '.github/workflows/verificar-respaldo.yml', '.github/workflows/respaldo-mysql.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  roundtrip:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Pruebas de cifrado y protecciones
+        run: python3 -m unittest discover -s ops/backup -p 'test_*.py'
+      - name: Dependencias del esquema
+        run: npm ci --prefix backend
+      - run: npm run build --prefix backend
+      - name: Cliente y servidor MySQL de prueba
+        run: docker pull mysql:8.4
+      - name: Probar recuperación en una base aislada
+        run: python3 ops/backup/integration_test.py
+
