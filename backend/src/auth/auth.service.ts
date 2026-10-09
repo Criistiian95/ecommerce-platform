@@ -19,11 +19,13 @@ export class AuthService {
     const expiresIn = (process.env.JWT_EXPIRES_IN ?? '8h') as SignOptions['expiresIn'];
     const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
 
-    await Session.create({
-      id: sessionId,
-      userId: user.id,
-      expiresAt,
-      revokedAt: null,
+    await this.db.sequelize.transaction(async transaction => {
+      const current = await User.findByPk(user.id, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!current || !current.active || current.passwordHash !== user.passwordHash ||
+          current.role !== user.role || current.commerceId !== user.commerceId) {
+        throw new UnauthorizedException('Credenciales inválidas');
+      }
+      await Session.create({ id: sessionId, userId: user.id, expiresAt, revokedAt: null }, { transaction });
     });
 
     const token = jwt.sign(
