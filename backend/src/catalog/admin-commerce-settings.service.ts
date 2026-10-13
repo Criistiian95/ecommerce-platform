@@ -11,6 +11,7 @@ type CommerceSettingsInput = {
   logoMimeType?: string | null;
   clearUploadedLogo?: boolean;
   whatsapp?: string | null;
+  salesEmail?: string | null;
   contactEmail?: string | null;
   contactPhone?: string | null;
   address?: string | null;
@@ -69,6 +70,7 @@ export class AdminCommerceSettingsService {
       logoMimeType: plain.logoMimeType,
       hasUploadedLogo,
       whatsapp: plain.whatsapp,
+      salesEmail: plain.salesEmail,
       contactEmail: plain.contactEmail,
       contactPhone: plain.contactPhone,
       address: plain.address,
@@ -106,7 +108,13 @@ export class AdminCommerceSettingsService {
       throw new BadRequestException('Debe quedar habilitada al menos una modalidad de entrega');
     }
 
+    if (input.salesEmail !== undefined && input.salesEmail !== null &&
+        (typeof input.salesEmail !== 'string' || (input.salesEmail.trim() &&
+        (input.salesEmail.trim().length > 190 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.salesEmail.trim()))))) {
+      throw new BadRequestException('El email para avisos de venta no es válido');
+    }
     await commerce.update({
+      ...(input.salesEmail !== undefined ? { salesEmail: input.salesEmail?.trim().toLowerCase() || null } : {}),
       ...(name !== undefined ? { name } : {}),
       ...(input.tagline !== undefined ? { tagline: input.tagline?.trim() || null } : {}),
       ...(input.primaryColor !== undefined ? { primaryColor: input.primaryColor } : {}),

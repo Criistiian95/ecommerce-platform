@@ -17,6 +17,7 @@ type Settings = {
   logoMimeType?:string|null;
   hasUploadedLogo:boolean;
   whatsapp?:string|null;
+  salesEmail?:string|null;
   contactEmail?:string|null;
   contactPhone?:string|null;
   address?:string|null;
@@ -111,6 +112,7 @@ export default function CommerceSettingsPage(){
         logoDataBase64:uploaded?.data ?? null,
         logoMimeType:uploaded?.mimeType ?? null,
         whatsapp:String(form.get('whatsapp') ?? '') || null,
+        salesEmail:String(form.get('salesEmail') ?? '') || null,
         contactEmail:String(form.get('contactEmail') ?? '') || null,
         contactPhone:String(form.get('contactPhone') ?? '') || null,
         address:String(form.get('address') ?? '') || null,
@@ -268,6 +270,11 @@ export default function CommerceSettingsPage(){
                 <label className="field">
                   Email de contacto
                   <input name="contactEmail" type="email" defaultValue={settings.contactEmail ?? ''} />
+                </label>
+                <label>
+                  Email para avisos de venta
+                  <input name="salesEmail" type="email" maxLength={190} defaultValue={settings.salesEmail ?? ''} />
+                  <small>Recibirá un aviso cuando se acredite una venta. No se muestra en la tienda. Dejalo vacío para desactivar nuevos avisos.</small>
                 </label>
                 <label className="field">
                   Dirección

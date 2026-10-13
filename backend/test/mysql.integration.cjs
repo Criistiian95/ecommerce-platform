@@ -49,7 +49,7 @@ test('MySQL: versioned legacy upgrade is repeatable and startup is read-only', a
   await db.onModuleInit();
   assert.equal(statements.some(sql => /ALTER|CREATE|DROP/i.test(sql)), false);
   const [versions] = await original('SELECT version FROM schema_migrations');
-  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding', '006_commerce_payments', '007_password_recovery']);
+  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email']);
   const [indexes] = await db.sequelize.query("SHOW INDEX FROM orders WHERE Column_name = 'checkout_key'");
   assert.ok(indexes.some(index => index.Non_unique === 0));
 });
@@ -366,4 +366,46 @@ test('MySQL recovery: a login checked before password reset cannot mint a sessio
   await service.reset(resetBody(f,token),randomUUID());
   await assert.rejects(new AuthService(db).createSession(stale),/Credenciales inválidas/);
   assert.equal(await Session.count({where:{userId:f.user.id,revokedAt:null}}),0);
+});
+
+test('MySQL merchant email: paid-only scheduling, duplicate payment, independent retry and tenant recipient snapshot', async () => {
+  await OrderEmailDelivery.update({ nextAttemptAt: new Date(Date.now()+86400000) }, {where:{status:'pending'}});
+  const f=await fixture(), other=await fixture();
+  await f.commerce.update({salesEmail:'seller@example.com'});
+  await other.commerce.update({salesEmail:'other@example.com'});
+  const result=await f.checkout.createOrder(f.commerce.slug,f.request);
+  const order=await Order.findByPk(result.order.id), email=new OrderEmailService(), mp=new MercadoPagoService(email);
+  assert.equal(await OrderEmailDelivery.count({where:{orderId:order.id}}),0);
+  await Promise.all([mp.confirmPaidOrder(await Order.findByPk(order.id)),mp.confirmPaidOrder(await Order.findByPk(order.id))]);
+  const deliveries=await OrderEmailDelivery.findAll({where:{orderId:order.id}});
+  assert.equal(deliveries.length,2);
+  const merchant=deliveries.find(d=>d.audience==='merchant'), customer=deliveries.find(d=>d.audience==='customer');
+  assert.equal(merchant.payload.merchantEmail,'seller@example.com');
+  await assert.rejects(OrderEmailDelivery.create({orderId:order.id,audience:'merchant',payload:{},nextAttemptAt:new Date()}));
+  await f.commerce.update({salesEmail:'changed@example.com'});
+  configured(); const sends=[]; let fail=true;
+  mock.method(email,'sendMessage',async(body,key)=>{const message=JSON.parse(body);sends.push({body,key,to:message.to[0]});return message.to[0]==='seller@example.com' && fail ? {retryable:true,error:'temporary'} : {id:'accepted',retryable:false};});
+  const worker=new OrderEmailWorker(email);await worker.run();
+  assert.equal((await customer.reload()).status,'sent');assert.equal((await merchant.reload()).status,'pending');
+  fail=false;await merchant.update({nextAttemptAt:new Date(0)});await worker.run();await worker.run();
+  const sellerSends=sends.filter(s=>s.to==='seller@example.com');
+  assert.equal(sellerSends.length,2);assert.deepEqual(sellerSends[0],sellerSends[1]);
+  assert.equal(sends.filter(s=>s.to===f.request.customerEmail).length,1);
+  assert.equal(sends.some(s=>['other@example.com','changed@example.com'].includes(s.to)),false);
+  const detail=await new AdminOrdersService().detail(f.commerce.id,order.id);
+  assert.equal(detail.email.status,'sent');assert.equal(detail.merchantEmail.status,'sent');
+});
+
+test('MySQL merchant settings: private destination validation and disabling future alerts', async () => {
+  const {AdminCommerceSettingsService}=require('../dist/catalog/admin-commerce-settings.service');
+  const {PublicCatalogService}=require('../dist/catalog/public-catalog.service');
+  const f=await fixture(), settings=new AdminCommerceSettingsService();
+  await assert.rejects(settings.updateSettings(f.commerce.id,{salesEmail:'invalid'}),/no es válido/);
+  await assert.rejects(settings.updateSettings(f.commerce.id,{salesEmail:42}),/no es válido/);
+  await settings.updateSettings(f.commerce.id,{salesEmail:' Seller@Example.com '});
+  assert.equal((await settings.getSettings(f.commerce.id)).salesEmail,'seller@example.com');
+  const publicData=await new PublicCatalogService().getCatalog(f.commerce.slug);
+  assert.equal(JSON.stringify(publicData).includes('seller@example.com'),false);
+  await settings.updateSettings(f.commerce.id,{salesEmail:''});
+  assert.equal((await settings.getSettings(f.commerce.id)).salesEmail,null);
 });
