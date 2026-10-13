@@ -13,6 +13,9 @@ type ConfirmationLine = {
 };
 
 export type ConfirmationInput = {
+  merchantEmail?: string;
+  customerPhone?: string;
+  notes?: string | null;
   commerceName: string;
   orderNumber: string;
   customerName: string;
@@ -43,7 +46,7 @@ export class OrderEmailService {
   }
 
   async enqueue(order: Order, transaction: Transaction) {
-    const commerce = await Commerce.findByPk(order.commerceId, { attributes: ['name'], transaction });
+    const commerce = await Commerce.findByPk(order.commerceId, { attributes: ['name', 'salesEmail'], transaction });
     if (!commerce) throw new Error('Commerce missing while scheduling order confirmation');
     const items = await OrderItem.findAll({ where: { orderId: order.id }, order: [['id', 'ASC']], transaction });
     const payload: ConfirmationInput = {
@@ -54,6 +57,33 @@ export class OrderEmailService {
         unitPrice: Number(item.unitPrice), lineTotal: Number(item.lineTotal) })),
     };
     await OrderEmailDelivery.create({ orderId: order.id, payload, status: 'pending', nextAttemptAt: new Date() }, { transaction });
+    const recipient = commerce.salesEmail?.trim();
+    if (recipient && recipient.length <= 190 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
+      await OrderEmailDelivery.create({ orderId: order.id, audience: 'merchant',
+        payload: { ...payload, merchantEmail: recipient, customerPhone: order.customerPhone, notes: order.notes },
+        status: 'pending', nextAttemptAt: new Date() }, { transaction });
+    }
+  }
+
+  buildMerchantMessage(input: ConfirmationInput, from: string) {
+    if (!input.merchantEmail) throw new Error('Merchant recipient missing');
+    const delivery = input.deliveryMethod === 'shipping' ? `Envío a ${input.address ?? ''}` : 'Retiro por el comercio';
+    const lines = [
+      `Nueva venta pagada en ${input.commerceName}`,
+      `Pedido: ${input.orderNumber}`,
+      'El pago fue acreditado.', '',
+      `Cliente: ${input.customerName}`,
+      `Email: ${input.customerEmail}`,
+      `Teléfono: ${input.customerPhone || 'No informado'}`, '',
+      ...input.items.map(item => `${item.quantity} x ${item.name} · ${this.money(item.unitPrice)} c/u · Subtotal ${this.money(item.lineTotal)}`),
+      '', `Total: ${this.money(input.total)}`, `Entrega: ${delivery}`,
+      ...(input.notes ? [`Observaciones: ${input.notes}`] : []), '',
+      'Ingresá al panel de pedidos de tu tienda para preparar la compra.',
+    ];
+    return { from, to: [input.merchantEmail], subject: `Nueva venta pagada - Pedido ${input.orderNumber}`,
+      text: lines.join('\n'),
+      html: `<div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#1f2937"><h1>Nueva venta pagada</h1>${lines.map(line => `<p>${this.escape(line)}</p>`).join('')}</div>`,
+      tags: [{ name: 'category', value: 'merchant_sale' }] };
   }
 
   buildMessage(input: ConfirmationInput, from: string) {

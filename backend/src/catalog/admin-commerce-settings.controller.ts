@@ -28,6 +28,7 @@ export class AdminCommerceSettingsController {
       logoMimeType?: string | null;
       clearUploadedLogo?: boolean;
       whatsapp?: string | null;
+      salesEmail?: string | null;
       contactEmail?: string | null;
       contactPhone?: string | null;
       address?: string | null;

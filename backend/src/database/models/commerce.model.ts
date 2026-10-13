@@ -11,6 +11,7 @@ export class Commerce extends Model {
   declare logoData: Buffer | null;
   declare logoMimeType: string | null;
   declare whatsapp: string | null;
+  declare salesEmail: string | null;
   declare contactEmail: string | null;
   declare contactPhone: string | null;
   declare address: string | null;
@@ -71,6 +72,7 @@ export class Commerce extends Model {
           type: DataTypes.STRING(60),
           allowNull: true,
         },
+        salesEmail: { type: DataTypes.STRING(190), allowNull: true, field: 'sales_email' },
         contactEmail: {
           type: DataTypes.STRING(160),
           allowNull: true,

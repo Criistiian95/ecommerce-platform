@@ -41,7 +41,9 @@ export class OrderEmailWorker implements OnApplicationBootstrap, OnModuleDestroy
       }
       await delivery.update({ status: 'sending', attempts: delivery.attempts + 1,
         firstAttemptAt: delivery.firstAttemptAt ?? now,
-        message: delivery.message ?? JSON.stringify(this.emails.buildMessage(delivery.payload as ConfirmationInput, process.env.ORDER_EMAIL_FROM!)),
+        message: delivery.message ?? JSON.stringify(delivery.audience === 'merchant'
+          ? this.emails.buildMerchantMessage(delivery.payload as ConfirmationInput, process.env.ORDER_EMAIL_FROM!)
+          : this.emails.buildMessage(delivery.payload as ConfirmationInput, process.env.ORDER_EMAIL_FROM!)),
         leaseUntil: new Date(now.getTime() + 60_000), leaseToken: randomUUID() }, { transaction });
       return delivery;
     });

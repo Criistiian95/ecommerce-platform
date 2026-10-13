@@ -2,6 +2,7 @@ import { DataTypes, Model, Sequelize } from 'sequelize';
 export class OrderEmailDelivery extends Model {
   declare id: string;
   declare orderId: string;
+  declare audience: 'customer' | 'merchant';
   declare status: 'pending' | 'sending' | 'sent' | 'failed';
   declare payload: Record<string, any>;
   declare message: string | null;
@@ -16,7 +17,8 @@ export class OrderEmailDelivery extends Model {
   static register(sequelize: Sequelize) {
     OrderEmailDelivery.init({
       id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
-      orderId: { type: DataTypes.UUID, allowNull: false, unique: true, field: 'order_id' },
+      orderId: { type: DataTypes.UUID, allowNull: false, field: 'order_id' },
+      audience: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'customer' },
       status: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'pending' },
       payload: { type: DataTypes.JSON, allowNull: false }, message: { type: DataTypes.TEXT('medium'), allowNull: true },
       attempts: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
@@ -25,6 +27,6 @@ export class OrderEmailDelivery extends Model {
       leaseUntil: { type: DataTypes.DATE, field: 'lease_until' }, leaseToken: { type: DataTypes.STRING(36), field: 'lease_token' },
       sentAt: { type: DataTypes.DATE, field: 'sent_at' }, providerMessageId: { type: DataTypes.STRING(150), field: 'provider_message_id' },
       lastError: { type: DataTypes.STRING(100), field: 'last_error' },
-    }, { sequelize, modelName: 'OrderEmailDelivery', tableName: 'order_email_deliveries', underscored: true });
+    }, { sequelize, modelName: 'OrderEmailDelivery', tableName: 'order_email_deliveries', underscored: true, indexes: [{ unique: true, name: 'uq_order_email_audience', fields: ['order_id', 'audience'] }] });
   }
 }

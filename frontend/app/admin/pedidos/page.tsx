@@ -34,6 +34,7 @@ type Order = {
   items: OrderItem[];
   allowedActions: string[];
   email?: { status: string; attempts: number; sentAt?: string } | null;
+  merchantEmail?: { status: string; attempts: number; sentAt?: string } | null;
 };
 
 type Summary = {
@@ -381,6 +382,11 @@ export default function AdminOrdersPage() {
                 <h3>Confirmación por correo</h3>
                 <p>{selected.email ? ({pending:'Pendiente de envío',sending:'Enviando',sent:'Enviado al proveedor',failed:'Requiere revisión'}[selected.email.status] ?? selected.email.status) : 'Sin registro de envío'}</p>
                 {selected.email && <small>Intentos: {selected.email.attempts}</small>}
+              </div>
+              <div className="order-detail-section">
+                <h3>Aviso de venta al comercio</h3>
+                <p>{selected.merchantEmail ? ({pending:'Pendiente de envío',sending:'Enviando',sent:'Enviado al proveedor',failed:'Requiere revisión'}[selected.merchantEmail.status] ?? selected.merchantEmail.status) : 'Sin aviso programado'}</p>
+                {selected.merchantEmail && <small>Intentos: {selected.merchantEmail.attempts}</small>}
               </div>
               <div className="order-detail-section">
                 <h3>Actualizar estado</h3>

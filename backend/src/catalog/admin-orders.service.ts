@@ -87,8 +87,12 @@ export class AdminOrdersService {
 
   async detail(commerceId: string | null, id: string) {
     const order = await this.findOrder(commerceId, id);
-    const email = await OrderEmailDelivery.findOne({ where: { orderId: order.id }, attributes: ['status', 'attempts', 'sentAt'] });
-    return { ...this.serialize(order), email: email ? { status: email.status, attempts: email.attempts, sentAt: email.sentAt } : null };
+    const deliveries = await OrderEmailDelivery.findAll({ where: { orderId: order.id }, attributes: ['audience', 'status', 'attempts', 'sentAt'] });
+    const summary = (audience: string) => {
+      const email = deliveries.find(delivery => delivery.audience === audience);
+      return email ? { status: email.status, attempts: email.attempts, sentAt: email.sentAt } : null;
+    };
+    return { ...this.serialize(order), email: summary('customer'), merchantEmail: summary('merchant') };
   }
 
   async updateStatus(
