@@ -49,7 +49,7 @@ test('MySQL: versioned legacy upgrade is repeatable and startup is read-only', a
   await db.onModuleInit();
   assert.equal(statements.some(sql => /ALTER|CREATE|DROP/i.test(sql)), false);
   const [versions] = await original('SELECT version FROM schema_migrations');
-  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font']);
+  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font', '010_store_cover']);
   const [indexes] = await db.sequelize.query("SHOW INDEX FROM orders WHERE Column_name = 'checkout_key'");
   assert.ok(indexes.some(index => index.Non_unique === 0));
 });
@@ -433,4 +433,21 @@ test('MySQL design: branding and logo persist to the public catalog of only the 
  await svc.updateSettings(a.commerce.id,{logoUrl:'https://example.com/new.png'});
  assert.equal((await pub.getCatalog(a.commerce.slug)).commerce.hasUploadedLogo,false);
  await assert.rejects(()=>pub.getCommerceLogo(a.commerce.slug));
+});
+
+
+test('MySQL covers: uploaded image persists, stays tenant scoped, survives color edits and is removed by preset',async()=>{
+ const {AdminCommerceSettingsService}=require('../dist/catalog/admin-commerce-settings.service');
+ const {PublicCatalogService}=require('../dist/catalog/public-catalog.service');
+ const a=await fixture(),b=await fixture(),svc=new AdminCommerceSettingsService(),pub=new PublicCatalogService();
+ const image=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
+ await svc.updateSettings(a.commerce.id,{coverPreset:'custom',coverDataBase64:image.toString('base64'),coverMimeType:'image/png',backgroundColor:'#faf5eb'});
+ const settings=await svc.getSettings(a.commerce.id);assert.equal(settings.hasUploadedCover,true);assert.equal(settings.coverData,undefined);
+ const catalog=(await pub.getCatalog(a.commerce.slug)).commerce;assert.equal(catalog.coverPreset,'custom');assert.equal(catalog.backgroundColor,'#faf5eb');assert.equal(catalog.hasUploadedCover,true);assert.equal(catalog.coverData,undefined);
+ assert.deepEqual((await pub.getCommerceCover(a.commerce.slug)).data,image);
+ await assert.rejects(()=>pub.getCommerceCover(b.commerce.slug));
+ await svc.updateSettings(a.commerce.id,{primaryColor:'#987042'});assert.deepEqual((await pub.getCommerceCover(a.commerce.slug)).data,image);
+ await a.commerce.update({active:false});await assert.rejects(()=>pub.getCommerceCover(a.commerce.slug));await a.commerce.update({active:true});
+ await svc.updateSettings(a.commerce.id,{coverPreset:'oak'});assert.equal((await svc.getSettings(a.commerce.id)).hasUploadedCover,false);await assert.rejects(()=>pub.getCommerceCover(a.commerce.slug));
+ await assert.rejects(()=>svc.updateSettings(a.commerce.id,{coverPreset:'custom'}));
 });

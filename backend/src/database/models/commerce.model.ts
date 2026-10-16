@@ -6,6 +6,10 @@ export class Commerce extends Model {
   declare slug: string;
   declare tagline: string | null;
   declare fontFamily: string;
+  declare backgroundColor: string;
+  declare coverPreset: string;
+  declare coverData: Buffer | null;
+  declare coverMimeType: string | null;
   declare primaryColor: string;
   declare secondaryColor: string;
   declare logoUrl: string | null;
@@ -43,6 +47,10 @@ export class Commerce extends Model {
           allowNull: true,
         },
         fontFamily: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'modern', field: 'font_family' },
+        backgroundColor: { type: DataTypes.STRING(20), allowNull: false, defaultValue: '#f7f9fd', field: 'background_color' },
+        coverPreset: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'none', field: 'cover_preset' },
+        coverData: { type: DataTypes.BLOB('medium'), allowNull: true, field: 'cover_data' },
+        coverMimeType: { type: DataTypes.STRING(60), allowNull: true, field: 'cover_mime_type' },
         primaryColor: {
           type: DataTypes.STRING(20),
           allowNull: false,
