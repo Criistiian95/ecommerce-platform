@@ -5,7 +5,7 @@ import { baseline } from './baseline';
 import { passwordRecoverySchema } from './password-recovery';
 
 type Query = (sql: string, values?: unknown[]) => Promise<any[]>;
-const versions = ['001_baseline', '002_legacy_checkout', '003_email_outbox', '004_customer_accounts', '005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font'];
+const versions = ['001_baseline', '002_legacy_checkout', '003_email_outbox', '004_customer_accounts', '005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font', '010_store_cover'];
 async function legacy(query: Query) {
   const columns: Record<string, Record<string, string>> = {
     products: { image_data: 'MEDIUMBLOB NULL', image_mime_type: 'VARCHAR(60) NULL', brand: 'VARCHAR(120) NULL', cost: 'DECIMAL(14,2) NULL', offer_price: 'DECIMAL(14,2) NULL', published: 'TINYINT(1) NOT NULL DEFAULT 1', featured: 'TINYINT(1) NOT NULL DEFAULT 0' },
@@ -139,6 +139,17 @@ export async function runMigrations(sequelize: Sequelize) {
       if (version === '009_store_font') {
         if (!(await query("SHOW COLUMNS FROM commerces WHERE Field = 'font_family'")).length)
           await query("ALTER TABLE commerces ADD COLUMN font_family VARCHAR(20) NOT NULL DEFAULT 'modern'");
+      }
+      if (version === '010_store_cover') {
+        const columns: Record<string,string> = {
+          background_color: "VARCHAR(20) NOT NULL DEFAULT '#f7f9fd'",
+          cover_preset: "VARCHAR(20) NOT NULL DEFAULT 'none'",
+          cover_data: 'MEDIUMBLOB NULL', cover_mime_type: 'VARCHAR(60) NULL',
+        };
+        for (const [name,type] of Object.entries(columns)) {
+          if (!(await query('SHOW COLUMNS FROM commerces WHERE Field = ?', [name])).length)
+            await query(`ALTER TABLE commerces ADD COLUMN \`${name}\` ${type}`);
+        }
       }
       // DDL is not transactional in MySQL; every step above is safe to resume.
       await query('INSERT INTO schema_migrations (version, applied_at) VALUES (?, NOW())', [version]);

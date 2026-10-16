@@ -9,9 +9,10 @@ export class PublicCatalogService {
     const commerce = await Commerce.findOne({
       where: { slug: commerceSlug, active: true },
       attributes: [
-        'id','fontFamily','updatedAt','name','slug','tagline','primaryColor','secondaryColor',
+        'backgroundColor','coverPreset','id','fontFamily','updatedAt','name','slug','tagline','primaryColor','secondaryColor',
         'logoUrl','logoMimeType','whatsapp','contactEmail','contactPhone',
         'address','businessHours','pickupEnabled','shippingEnabled',
+        [Commerce.sequelize!.literal('(cover_data IS NOT NULL)'), 'hasUploadedCover'],
         [Commerce.sequelize!.literal('(logo_data IS NOT NULL)'), 'hasUploadedLogo'],
       ],
     });
@@ -82,6 +83,9 @@ export class PublicCatalogService {
         slug: commerce.slug,
         tagline: commerce.tagline,
         fontFamily: commerce.fontFamily,
+        backgroundColor: commerce.backgroundColor,
+        coverPreset: commerce.coverPreset,
+        hasUploadedCover: Boolean(commerce.get('hasUploadedCover')),
         primaryColor: commerce.primaryColor,
         secondaryColor: commerce.secondaryColor,
         logoUrl: commerce.logoUrl,
@@ -97,6 +101,12 @@ export class PublicCatalogService {
       categories: [...categoryMap.values()].sort((a, b) => a.name.localeCompare(b.name)),
       products: publicProducts,
     };
+  }
+
+  async getCommerceCover(commerceSlug: string) {
+    const commerce = await Commerce.findOne({ where: {slug: commerceSlug, active: true, coverPreset: 'custom'}, attributes: ['coverData','coverMimeType'] });
+    if (!commerce?.coverData || !commerce.coverMimeType) throw new NotFoundException('Portada no encontrada');
+    return {data: commerce.coverData, mimeType: commerce.coverMimeType};
   }
 
   async getCommerceLogo(commerceSlug: string) {

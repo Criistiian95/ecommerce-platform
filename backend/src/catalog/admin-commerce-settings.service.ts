@@ -1,7 +1,11 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Commerce } from '../database/models/commerce.model';
 
-type CommerceSettingsInput = {
+export type CommerceSettingsInput = {
+  backgroundColor?: string;
+  coverPreset?: string;
+  coverDataBase64?: string;
+  coverMimeType?: string;
   name?: string;
   tagline?: string | null;
   fontFamily?: string;
@@ -50,6 +54,17 @@ export class AdminCommerceSettingsService {
     return { buffer, mime };
   }
 
+  private decodeCover(input: CommerceSettingsInput) {
+    if (input.coverDataBase64 === undefined) return null;
+    const value = input.coverDataBase64;
+    const mime = input.coverMimeType;
+    if (typeof value !== 'string' || !value.length || value.length > 2800000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(value) || !['image/png','image/jpeg','image/webp'].includes(mime || '')) throw new BadRequestException('Portada inválida: usá JPG, PNG o WebP de hasta 2 MB');
+    const buffer = Buffer.from(value, 'base64');
+    const valid = mime === 'image/png' ? buffer.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])) : mime === 'image/jpeg' ? buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255 : buffer.toString('ascii',0,4) === 'RIFF' && buffer.toString('ascii',8,12) === 'WEBP';
+    if (!valid || buffer.length > 2 * 1024 * 1024) throw new BadRequestException('Portada inválida: usá JPG, PNG o WebP de hasta 2 MB');
+    return {buffer, mime: mime!};
+  }
+
   private validateColor(value: string | undefined, label: string) {
     if (value === undefined) return;
     if (!/^#[0-9a-fA-F]{6}$/.test(value)) {
@@ -69,6 +84,9 @@ export class AdminCommerceSettingsService {
       slug: plain.slug,
       tagline: plain.tagline,
       fontFamily: plain.fontFamily,
+      backgroundColor: plain.backgroundColor,
+      coverPreset: plain.coverPreset,
+      hasUploadedCover: Boolean(plain.coverData),
       primaryColor: plain.primaryColor,
       secondaryColor: plain.secondaryColor,
       logoUrl: plain.logoUrl,
@@ -97,6 +115,11 @@ export class AdminCommerceSettingsService {
     if (!commerce) throw new NotFoundException('Comercio no encontrado');
 
     if(input.fontFamily!==undefined && !['modern','classic','friendly','mono'].includes(input.fontFamily)) throw new BadRequestException('Tipografía inválida');
+    this.validateColor(input.backgroundColor, 'El color de fondo');
+    if (input.coverPreset !== undefined && !['none','oak','workshop','home','custom'].includes(input.coverPreset)) throw new BadRequestException('Portada inválida');
+    const cover = this.decodeCover(input);
+    if (cover && input.coverPreset !== 'custom') throw new BadRequestException('Elegí la portada personalizada para subir una imagen');
+    if (input.coverPreset === 'custom' && !cover && !commerce.coverData) throw new BadRequestException('Subí una imagen para la portada');
     this.validateColor(input.primaryColor, 'El color principal');
     this.validateColor(input.secondaryColor, 'El color secundario');
 
@@ -129,6 +152,10 @@ export class AdminCommerceSettingsService {
       throw new BadRequestException('El email para avisos de venta no es válido');
     }
     await commerce.update({
+      ...(input.backgroundColor !== undefined ? { backgroundColor: input.backgroundColor } : {}),
+      ...(input.coverPreset !== undefined ? { coverPreset: input.coverPreset } : {}),
+      ...(cover ? { coverData: cover.buffer, coverMimeType: cover.mime } : {}),
+      ...(input.coverPreset !== undefined && input.coverPreset !== 'custom' ? { coverData: null, coverMimeType: null } : {}),
       ...(input.fontFamily!==undefined ? {fontFamily:input.fontFamily} : {}),
       ...(input.salesEmail !== undefined ? { salesEmail: input.salesEmail?.trim().toLowerCase() || null } : {}),
       ...(name !== undefined ? { name } : {}),

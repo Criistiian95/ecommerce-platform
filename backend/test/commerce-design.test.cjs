@@ -27,3 +27,8 @@ test('registration creates owner and commerce in one transaction and ignores sup
 test('registration reports duplicate slug without attaching an owner to another commerce',async()=>{
  mock.method(Commerce,'findOne',async()=>({id:'existing'}));const svc=new AuthService({});await assert.rejects(()=>svc.registerCommerce(input),/ya está en uso/);
 });
+
+test('cover validation rejects unsafe types, invalid palettes, missing files and oversized images',async()=>{
+ mock.method(Commerce,'findByPk',async()=>commerce());const svc=new AdminCommerceSettingsService();
+ for(const input of [{backgroundColor:'red'},{coverPreset:'unknown'},{coverPreset:'custom'},{coverPreset:'custom',coverDataBase64:'PHN2Zz4=',coverMimeType:'image/svg+xml'},{coverPreset:'custom',coverDataBase64:'PHN2Zz4=',coverMimeType:'image/png'},{coverPreset:'custom',coverDataBase64:'A'.repeat(2800001),coverMimeType:'image/png'}]) await assert.rejects(()=>svc.updateSettings('a',input));
+});

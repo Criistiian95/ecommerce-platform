@@ -10,6 +10,7 @@ async function bootstrap() {
   app.enableShutdownHooks();
   app.use('/auth/commerce/register', json({ limit: '8kb' }));
   app.use('/auth/password', json({ limit: '8kb' }));
+  app.use('/admin/commerce/settings', json({ limit: '6mb' }));
   app.use(json({ limit: '4mb' }));
   app.use(urlencoded({ extended: true, limit: '4mb' }));
 

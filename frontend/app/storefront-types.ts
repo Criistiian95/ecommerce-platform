@@ -25,6 +25,10 @@ export type StoreCatalog = {
     slug: string;
     tagline?: string | null;
     fontFamily?: string;
+    backgroundColor?: string;
+    coverPreset?: string;
+    hasUploadedCover?: boolean;
+    coverUrl?: string;
     primaryColor: string;
     secondaryColor: string;
     logoUrl?: string | null;

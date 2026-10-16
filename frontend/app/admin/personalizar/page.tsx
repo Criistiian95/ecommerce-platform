@@ -1,16 +1,31 @@
 'use client';
 import Link from 'next/link';
+import { storeCovers, storeCover } from '../../store-covers';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import styles from './personalizar.module.css';
 import { API_URL } from '../../storefront-types';
 import { useStorefront } from '../../storefront-context';
 
-type Design={fontFamily:string;name:string;tagline:string;primaryColor:string;secondaryColor:string;logoUrl:string};
-type Settings=Design & {slug:string;hasUploadedLogo:boolean;updatedAt?:string};
-const palettes=[['Bosque','#237059','#172522'],['Madera','#865735','#33291f'],['Océano','#245ce6','#172238'],['Ciruela','#793e76','#302136']];
+type Design={backgroundColor:string;coverPreset:string;coverUrl:string;fontFamily:string;name:string;tagline:string;primaryColor:string;secondaryColor:string;logoUrl:string};
+type Settings=Design & {slug:string;hasUploadedLogo:boolean;hasUploadedCover:boolean;updatedAt?:string};
+const palettes=[
+  ['Roble','#987042','#332b22','#faf5eb'],
+  ['Nogal','#73513c','#302620','#f5efe8'],
+  ['Cedro','#a35234','#3b2924','#fbf0e8'],
+  ['Arena','#86704b','#34312b','#faf7ef'],
+  ['Oliva','#62724a','#293225','#f4f5ed'],
+  ['Bosque','#237059','#172f28','#f0f6f2'],
+  ['Terracota','#b04d3b','#442b29','#fcf2ed'],
+  ['Océano','#245ce6','#172238','#f4f7ff'],
+  ['Petróleo','#166779','#17323a','#edf6f7'],
+  ['Ciruela','#793e76','#302136','#faf2f9'],
+  ['Rosa','#b63867','#432434','#fff3f7'],
+  ['Grafito','#48515c','#20252c','#f4f5f6'],
+];
 export default function Personalizar(){
   const {isTenantDomain}=useStorefront();
   const frame=useRef<HTMLIFrameElement>(null);
+  const coverInput=useRef<HTMLInputElement>(null);
   const fileInput=useRef<HTMLInputElement>(null);
   const [token,setToken]=useState('');const [loaded,setLoaded]=useState(false);
   const [settings,setSettings]=useState<Settings|null>(null);
@@ -21,7 +36,7 @@ export default function Personalizar(){
   const [message,setMessage]=useState('');const [error,setError]=useState('');
   const dirty=!!design && JSON.stringify(design)!==baseline;
   function accept(data:Settings){
-    const next={fontFamily:data.fontFamily||'modern',name:data.name,tagline:data.tagline||'',primaryColor:data.primaryColor,secondaryColor:data.secondaryColor,logoUrl:data.hasUploadedLogo?`${API_URL}/catalog/store/${encodeURIComponent(data.slug)}/logo?v=${encodeURIComponent(data.updatedAt||'')}`:data.logoUrl||''};
+    const next={backgroundColor:data.backgroundColor||'#f7f9fd',coverPreset:data.coverPreset||'none',coverUrl:storeCover(data),fontFamily:data.fontFamily||'modern',name:data.name,tagline:data.tagline||'',primaryColor:data.primaryColor,secondaryColor:data.secondaryColor,logoUrl:data.hasUploadedLogo?`${API_URL}/catalog/store/${encodeURIComponent(data.slug)}/logo?v=${encodeURIComponent(data.updatedAt||'')}`:data.logoUrl||''};
     setSettings(data);setDesign(next);setBaseline(JSON.stringify(next));
   }
   async function load(auth:string){
@@ -33,24 +48,30 @@ export default function Personalizar(){
   useEffect(()=>{if(design)frame.current?.contentWindow?.postMessage({type:'disenolys-design',design},window.location.origin);},[design,ready]);
   useEffect(()=>{if(!dirty)return;const warn=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue='';};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[dirty]);
   function change(key:keyof Design,value:string){setDesign(d=>d?{...d,[key]:value}:d);setMessage('');}
-  async function upload(file?:File){
+  async function upload(file:File|undefined,kind:'logo'|'cover'='logo'){
     if(!file)return;setError('');
-    if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>2*1024*1024){setError('Elegí un logo PNG, JPG o WebP de hasta 2 MB.');return;}
+    if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>2*1024*1024){setError('Elegí una imagen PNG, JPG o WebP de hasta 2 MB.');return;}
     setReading(true);
-    try{const data=await new Promise<string>((resolve,reject)=>{const r=new FileReader();r.onerror=()=>reject(Error('No se pudo leer el logo.'));r.onload=()=>resolve(String(r.result));r.readAsDataURL(file);});await new Promise<void>((resolve,reject)=>{const img=new Image();img.onload=()=>resolve();img.onerror=()=>reject(Error('La imagen está dañada.'));img.src=data;});change('logoUrl',data);}
+    try{const data=await new Promise<string>((resolve,reject)=>{const r=new FileReader();r.onerror=()=>reject(Error('No se pudo leer el logo.'));r.onload=()=>resolve(String(r.result));r.readAsDataURL(file);});await new Promise<void>((resolve,reject)=>{const img=new Image();img.onload=()=>resolve();img.onerror=()=>reject(Error('La imagen está dañada.'));img.src=data;});if(kind==='cover'){setDesign(d=>d?{...d,coverPreset:'custom',coverUrl:data}:d);setMessage('');}else change('logoUrl',data);}
     catch(e){setError(e instanceof Error?e.message:'No se pudo cargar el logo.');}finally{setReading(false);}
   }
   async function save(e:FormEvent){
     e.preventDefault();if(!design||!settings)return;setSaving(true);setError('');setMessage('');
     try{
-      const {logoUrl,...brand}=design;const old=JSON.parse(baseline) as Design;
+      const {logoUrl,coverUrl,...brand}=design;const old=JSON.parse(baseline) as Design;
       let logo:{}={};
       if(logoUrl!==old.logoUrl){
         const data=logoUrl.match(/^data:(image\/(?:png|jpeg|webp));base64,(.+)$/);
         logo=data?{logoDataBase64:data[2],logoMimeType:data[1]}:{logoUrl:logoUrl||null,clearUploadedLogo:true};
       }
-      const r=await fetch(`${API_URL}/admin/commerce/settings`,{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({...brand,...logo})});
-      const data=await r.json();if(!r.ok)throw Error(typeof data.message==='string'?data.message:'No se pudo guardar.');accept(data);if(fileInput.current)fileInput.current.value='';setMessage('Diseño guardado. Ya está aplicado a tu tienda.');
+      let cover:{}={};
+      if(design.coverPreset==='custom' && coverUrl!==old.coverUrl){
+        const data=coverUrl.match(/^data:(image\/(?:png|jpeg|webp));base64,(.+)$/);
+        if(!data)throw Error('Volvé a seleccionar la imagen de portada.');
+        cover={coverDataBase64:data[2],coverMimeType:data[1]};
+      }
+      const r=await fetch(`${API_URL}/admin/commerce/settings`,{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({...brand,...logo,...cover})});
+      const data=await r.json();if(!r.ok)throw Error(typeof data.message==='string'?data.message:'No se pudo guardar.');accept(data);if(fileInput.current)fileInput.current.value='';if(coverInput.current)coverInput.current.value='';setMessage('Diseño guardado. Ya está aplicado a tu tienda.');
     }catch(e){setError(e instanceof Error?e.message:'No se pudo guardar. Tus cambios siguen en la vista previa.');}finally{setSaving(false);}
   }
   if(!loaded)return <main className="shell">Cargando…</main>;
@@ -67,12 +88,21 @@ export default function Personalizar(){
         <label>Logo de tu comercio<input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>void upload(e.target.files?.[0])}/></label><small>PNG, JPG o WebP · Hasta 2 MB</small>
         {design.logoUrl&&<div className={styles.logo}><img src={design.logoUrl} alt="Vista previa del logo"/><button type="button" onClick={()=>{change('logoUrl','');if(fileInput.current)fileInput.current.value='';}}>Quitar logo</button></div>}
         <label>O usar una URL del logo<input type="url" placeholder="https://..." value={design.logoUrl.startsWith('data:')?'':design.logoUrl} onChange={e=>change('logoUrl',e.target.value)}/></label>
+        <h2>Imagen de portada</h2>
+        <p className={styles.note}>Elegí una foto propia o una imagen de ejemplo. Podés ver el resultado antes de guardar.</p>
+        <label>Subir mi portada<input ref={coverInput} type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>void upload(e.target.files?.[0],'cover')}/></label>
+        <small>JPG, PNG o WebP · Hasta 2 MB · Recomendamos una foto horizontal. Se adapta al tamaño de pantalla.</small>
+        {design.coverPreset==='custom'&&<img className={styles.coverPreview} src={design.coverUrl} alt="Tu portada seleccionada"/>}
+        <div className={styles.covers}>{storeCovers.map(cover=><button type="button" key={cover.id} aria-pressed={design.coverPreset===cover.id} onClick={()=>{setDesign({...design,coverPreset:cover.id,coverUrl:cover.src});setMessage('');if(coverInput.current)coverInput.current.value='';}}><img src={cover.src} alt=""/><span>{cover.name}</span></button>)}</div>
+        <small>Imágenes decorativas de ejemplo generadas con IA. No representan trabajos del comercio.</small>
+        <button type="button" aria-pressed={design.coverPreset==='none'} onClick={()=>{setDesign({...design,coverPreset:'none',coverUrl:''});setMessage('');if(coverInput.current)coverInput.current.value='';}}>Sin imagen · Portada simple</button>
+        <h2>Colores y tipografía</h2>
         <label>Tipo de letra<select value={design.fontFamily} onChange={e=>change('fontFamily',e.target.value)}><option value="modern">Moderna · Arial</option><option value="classic">Clásica · Georgia</option><option value="friendly">Cercana · Trebuchet</option><option value="mono">Monoespaciada · Courier</option></select></label>
-        <div className={styles.colors}><label>Color principal<input type="color" value={design.primaryColor} onChange={e=>change('primaryColor',e.target.value)}/></label><label>Color del texto<input type="color" value={design.secondaryColor} onChange={e=>change('secondaryColor',e.target.value)}/></label></div>
-        <div className={styles.palettes}>{palettes.map(([name,primaryColor,secondaryColor])=><button type="button" key={name} onClick={()=>{setDesign({...design,primaryColor,secondaryColor});setMessage('');}}><i style={{background:primaryColor}}/>{name}</button>)}</div>
+        <div className={styles.colors}><label>Color de fondo<input type="color" value={design.backgroundColor} onChange={e=>change('backgroundColor',e.target.value)}/></label><label>Color principal<input type="color" value={design.primaryColor} onChange={e=>change('primaryColor',e.target.value)}/></label><label>Color del texto<input type="color" value={design.secondaryColor} onChange={e=>change('secondaryColor',e.target.value)}/></label></div>
+        <div className={styles.palettes}>{palettes.map(([name,primaryColor,secondaryColor,backgroundColor])=><button type="button" key={name} onClick={()=>{setDesign({...design,primaryColor,secondaryColor,backgroundColor});setMessage('');}}><i style={{background:primaryColor}}/><i style={{background:secondaryColor}}/><i style={{background:backgroundColor}}/>{name}</button>)}</div>
         <p className={styles.note}>{dirty?'Tenés cambios sin guardar.':'Tu diseño está guardado.'}</p>
-        <button className={styles.save} disabled={!dirty} type="submit">{saving?'Guardando…':reading?'Cargando logo…':'Guardar cambios en mi tienda'}</button>
-        <button type="button" disabled={!dirty} onClick={()=>{setDesign(JSON.parse(baseline));setError('');setMessage('');if(fileInput.current)fileInput.current.value='';}}>Descartar cambios</button>
+        <button className={styles.save} disabled={!dirty} type="submit">{saving?'Guardando…':reading?'Cargando imagen…':'Guardar cambios en mi tienda'}</button>
+        <button type="button" disabled={!dirty} onClick={()=>{setDesign(JSON.parse(baseline));if(coverInput.current)coverInput.current.value='';setError('');setMessage('');if(fileInput.current)fileInput.current.value='';}}>Descartar cambios</button>
       </fieldset></form>
       <section className={styles.preview}><div className={styles.toolbar}><strong>Vista previa de tu tienda</strong><div><button type="button" aria-pressed={!mobile} onClick={()=>setMobile(false)}>Computadora</button><button type="button" aria-pressed={mobile} onClick={()=>setMobile(true)}>Celular</button></div></div>
         <div className={styles.frameWrap}><iframe ref={frame} onLoad={()=>setReady(n=>n+1)} title="Vista previa de la tienda real" src={`${storePath}?personalizar=1`} className={mobile?styles.mobile:styles.desktop} tabIndex={-1}/></div>

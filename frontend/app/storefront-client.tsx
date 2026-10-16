@@ -1,4 +1,5 @@
 'use client';
+import { storeCover } from './store-covers';
 import { storeFont } from './store-fonts';
 import {CSSProperties,useEffect,useState} from 'react';
 import Link from './store-link';
@@ -21,7 +22,8 @@ export default function StorefrontClient({demoMode=false}:{demoMode?:boolean}){
       const d=event.data.design;
       if(!d || typeof d.name!=='string' || d.name.length>120 || typeof d.tagline!=='string' || d.tagline.length>180 || !/^#[0-9a-f]{6}$/i.test(d.primaryColor) || !/^#[0-9a-f]{6}$/i.test(d.secondaryColor)) return;
       const logo=typeof d.logoUrl==='string' && /^(https?:\/\/|data:image\/(png|jpeg|webp);base64,)/.test(d.logoUrl) ? d.logoUrl : null;
-      setDesignPreview({name:d.name,tagline:d.tagline,primaryColor:d.primaryColor,secondaryColor:d.secondaryColor,fontFamily:d.fontFamily,logoUrl:logo,hasUploadedLogo:false});
+      const cover=typeof d.coverUrl==='string' && /^(https?:\/\/|data:image\/(png|jpeg|webp);base64,|\/covers\/(oak|workshop|home)\.webp$)/.test(d.coverUrl) ? d.coverUrl : '';
+      setDesignPreview({backgroundColor:/^#[0-9a-f]{6}$/i.test(d.backgroundColor)?d.backgroundColor:'#f7f9fd',coverPreset:d.coverPreset,coverUrl:cover,hasUploadedCover:false,name:d.name,tagline:d.tagline,primaryColor:d.primaryColor,secondaryColor:d.secondaryColor,fontFamily:d.fontFamily,logoUrl:logo,hasUploadedLogo:false});
     };
     const blockActions=(event:Event)=>{
       const target=event.target instanceof Element?event.target.closest('a,button,form'):null;
@@ -57,9 +59,11 @@ export default function StorefrontClient({demoMode=false}:{demoMode?:boolean}){
   const logoSrc=commerce?.hasUploadedLogo
     ? `${API_URL}/catalog/store/${COMMERCE_SLUG}/logo?v=${encodeURIComponent(commerce.updatedAt || "")}`
     : commerce?.logoUrl ?? '';
+  const coverSrc=commerce ? (commerce.coverUrl ?? storeCover(commerce)) : '';
   const whatsappNumber=(commerce?.whatsapp ?? '').replace(/\D/g,'');
   const themeStyle={
     '--store-font':storeFont(commerce?.fontFamily),
+    '--store-background':commerce?.backgroundColor || '#f7f9fd',
     '--accent':commerce?.primaryColor || '#245ce6',
     '--ink':commerce?.secondaryColor || '#172238',
   } as CSSProperties;
@@ -70,9 +74,9 @@ export default function StorefrontClient({demoMode=false}:{demoMode?:boolean}){
       <Link href="/tienda" className="store-identity">{logoSrc?<img className="store-logo" src={logoSrc} alt={brandName}/>:<span className="store-monogram" aria-hidden="true">{brandName.charAt(0).toUpperCase()}</span>}<div><div className="store-brand">{brandName}</div><small>{tagline}</small></div></Link>
       <div className="store-header-actions"><a className="store-nav-link" href="#catalogo">Explorar catálogo</a><Link className="store-nav-link" href={user?'/mi-cuenta':'/cliente/login'}>{user?'Mi cuenta':'Ingresar'}</Link><Link className="btn primary" href="/carrito">Carrito <span className="cart-count">{totalItems}</span></Link></div>
     </header>
-    <section className="store-hero">
+    <section className={`store-hero ${coverSrc?'with-cover':'without-cover'}`}>
       <div className="hero-copy"><span className="eyebrow">COMPRA ONLINE</span><h1>Todo lo que buscás,<br/><em>en {brandName}.</em></h1><p>{commerce?.tagline || 'Explorá nuestro catálogo, elegí tus productos y comprá de forma simple y segura.'}</p><a className="btn primary" href="#catalogo">Ver productos <span aria-hidden="true">↗</span></a></div>
-      <div className="hero-art" aria-hidden="true"><div className="art-orbit"></div><div className="art-bag"><span>{brandName}</span><strong>Comprá.<br/>Online.</strong><span className="bag-spark">✳</span></div><div className="art-label">TIENDA ONLINE</div></div>
+      {coverSrc&&<div className="hero-cover"><img src={coverSrc} alt=""/></div>}
     </section>
     <div className="store-benefits"><span><b>01</b> Elegí tus productos</span><span><b>02</b> Armá tu carrito</span><span><b>03</b> Pagá con Mercado Pago</span></div>
     <section className="store-section" id="catalogo">
