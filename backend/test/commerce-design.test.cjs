@@ -13,7 +13,7 @@ test('editing colors retains uploaded logo; URL replacement and clear remove it'
  const c=commerce();mock.method(Commerce,'findByPk',async()=>c);const svc=new AdminCommerceSettingsService();assert.equal((await svc.updateSettings('a',{primaryColor:'#237059'})).hasUploadedLogo,true);assert.equal((await svc.updateSettings('a',{logoUrl:'https://example.com/logo.png'})).hasUploadedLogo,false);assert.equal((await svc.updateSettings('a',{logoUrl:null,clearUploadedLogo:true})).logoUrl,null);
 });
 test('design rejects missing tenant, unsafe URL and invalid colors',async()=>{
- mock.method(Commerce,'findByPk',async()=>commerce());const svc=new AdminCommerceSettingsService();await assert.rejects(()=>svc.updateSettings(null,{}));await assert.rejects(()=>svc.updateSettings('a',{logoUrl:'javascript:alert(1)'}));await assert.rejects(()=>svc.updateSettings('a',{primaryColor:'red'}));
+ mock.method(Commerce,'findByPk',async()=>commerce());const svc=new AdminCommerceSettingsService();await assert.rejects(()=>svc.updateSettings(null,{}));await assert.rejects(()=>svc.updateSettings('a',{logoUrl:'javascript:alert(1)'}));await assert.rejects(()=>svc.updateSettings('a',{primaryColor:'red'}));await assert.rejects(()=>svc.updateSettings('a',{fontFamily:'arbitrary-css'}));
 });
 const input={commerceName:'New shop',commerceSlug:'new-shop',adminName:'Owner',email:'OWNER@example.com',password:'a-long-password'};
 test('merchant registration validates reserved slugs and credentials before database writes',async()=>{

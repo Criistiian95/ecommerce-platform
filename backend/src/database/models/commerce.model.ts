@@ -5,6 +5,7 @@ export class Commerce extends Model {
   declare name: string;
   declare slug: string;
   declare tagline: string | null;
+  declare fontFamily: string;
   declare primaryColor: string;
   declare secondaryColor: string;
   declare logoUrl: string | null;
@@ -41,6 +42,7 @@ export class Commerce extends Model {
           type: DataTypes.STRING(180),
           allowNull: true,
         },
+        fontFamily: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'modern', field: 'font_family' },
         primaryColor: {
           type: DataTypes.STRING(20),
           allowNull: false,

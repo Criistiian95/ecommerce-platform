@@ -24,6 +24,7 @@ export type StoreCatalog = {
     name: string;
     slug: string;
     tagline?: string | null;
+    fontFamily?: string;
     primaryColor: string;
     secondaryColor: string;
     logoUrl?: string | null;

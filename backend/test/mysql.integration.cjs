@@ -49,7 +49,7 @@ test('MySQL: versioned legacy upgrade is repeatable and startup is read-only', a
   await db.onModuleInit();
   assert.equal(statements.some(sql => /ALTER|CREATE|DROP/i.test(sql)), false);
   const [versions] = await original('SELECT version FROM schema_migrations');
-  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email']);
+  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font']);
   const [indexes] = await db.sequelize.query("SHOW INDEX FROM orders WHERE Column_name = 'checkout_key'");
   assert.ok(indexes.some(index => index.Non_unique === 0));
 });
@@ -426,8 +426,8 @@ test('MySQL design: branding and logo persist to the public catalog of only the 
  const {PublicCatalogService}=require('../dist/catalog/public-catalog.service');
  const a=await fixture(),b=await fixture(),svc=new AdminCommerceSettingsService(),pub=new PublicCatalogService();
  const image=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
- await svc.updateSettings(a.commerce.id,{name:'My design',tagline:'My headline',primaryColor:'#865735',logoDataBase64:image.toString('base64'),logoMimeType:'image/png'});
- const catalog=await pub.getCatalog(a.commerce.slug);assert.equal(catalog.commerce.name,'My design');assert.equal(catalog.commerce.primaryColor,'#865735');assert.equal(catalog.commerce.hasUploadedLogo,true);assert.ok(catalog.commerce.updatedAt);
+ await svc.updateSettings(a.commerce.id,{fontFamily:'classic',name:'My design',tagline:'My headline',primaryColor:'#865735',logoDataBase64:image.toString('base64'),logoMimeType:'image/png'});
+ const catalog=await pub.getCatalog(a.commerce.slug);assert.equal(catalog.commerce.name,'My design');assert.equal(catalog.commerce.fontFamily,'classic');assert.equal(catalog.commerce.primaryColor,'#865735');assert.equal(catalog.commerce.hasUploadedLogo,true);assert.ok(catalog.commerce.updatedAt);
  assert.deepEqual((await pub.getCommerceLogo(a.commerce.slug)).data,image);
  assert.equal((await pub.getCatalog(b.commerce.slug)).commerce.name,'Test');
  await svc.updateSettings(a.commerce.id,{logoUrl:'https://example.com/new.png'});
