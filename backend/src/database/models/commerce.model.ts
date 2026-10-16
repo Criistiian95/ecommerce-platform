@@ -4,6 +4,10 @@ export class Commerce extends Model {
   declare id: string;
   declare name: string;
   declare slug: string;
+  declare heroTitle: string | null;
+  declare heroButtonText: string | null;
+  declare announcementText: string | null;
+  declare heroLayout: string;
   declare tagline: string | null;
   declare fontFamily: string;
   declare backgroundColor: string;
@@ -42,6 +46,10 @@ export class Commerce extends Model {
           allowNull: false,
           unique: true,
         },
+        heroTitle: {type: DataTypes.STRING(180),allowNull:true,field:'hero_title'},
+        heroButtonText: {type: DataTypes.STRING(40),allowNull:true,field:'hero_button_text'},
+        announcementText: {type: DataTypes.STRING(160),allowNull:true,field:'announcement_text'},
+        heroLayout: {type: DataTypes.STRING(20),allowNull:false,defaultValue:'split',field:'hero_layout'},
         tagline: {
           type: DataTypes.STRING(180),
           allowNull: true,

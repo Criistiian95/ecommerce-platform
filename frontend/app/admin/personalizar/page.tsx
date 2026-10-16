@@ -1,12 +1,13 @@
 'use client';
 import Link from 'next/link';
+import { transparentLogo } from '../../logo-background';
 import { storeCovers, storeCover } from '../../store-covers';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import styles from './personalizar.module.css';
 import { API_URL } from '../../storefront-types';
 import { useStorefront } from '../../storefront-context';
 
-type Design={backgroundColor:string;coverPreset:string;coverUrl:string;fontFamily:string;name:string;tagline:string;primaryColor:string;secondaryColor:string;logoUrl:string};
+type Design={heroTitle:string;heroButtonText:string;announcementText:string;heroLayout:string;backgroundColor:string;coverPreset:string;coverUrl:string;fontFamily:string;name:string;tagline:string;primaryColor:string;secondaryColor:string;logoUrl:string};
 type Settings=Design & {slug:string;hasUploadedLogo:boolean;hasUploadedCover:boolean;updatedAt?:string};
 const palettes=[
   ['Roble','#987042','#332b22','#faf5eb'],
@@ -33,11 +34,12 @@ export default function Personalizar(){
   const [baseline,setBaseline]=useState('');
   const [ready,setReady]=useState(0);const [mobile,setMobile]=useState(false);
   const [saving,setSaving]=useState(false);const [reading,setReading]=useState(false);
+  const [logoOriginal,setLogoOriginal]=useState('');const [logoTolerance,setLogoTolerance]=useState(32);const [logoInside,setLogoInside]=useState(false);
   const [message,setMessage]=useState('');const [error,setError]=useState('');
   const dirty=!!design && JSON.stringify(design)!==baseline;
   function accept(data:Settings){
-    const next={backgroundColor:data.backgroundColor||'#f7f9fd',coverPreset:data.coverPreset||'none',coverUrl:storeCover(data),fontFamily:data.fontFamily||'modern',name:data.name,tagline:data.tagline||'',primaryColor:data.primaryColor,secondaryColor:data.secondaryColor,logoUrl:data.hasUploadedLogo?`${API_URL}/catalog/store/${encodeURIComponent(data.slug)}/logo?v=${encodeURIComponent(data.updatedAt||'')}`:data.logoUrl||''};
-    setSettings(data);setDesign(next);setBaseline(JSON.stringify(next));
+    const next={heroTitle:data.heroTitle||'',heroButtonText:data.heroButtonText||'',announcementText:data.announcementText||'',heroLayout:data.heroLayout||'split',backgroundColor:data.backgroundColor||'#f7f9fd',coverPreset:data.coverPreset||'none',coverUrl:storeCover(data),fontFamily:data.fontFamily||'modern',name:data.name,tagline:data.tagline||'',primaryColor:data.primaryColor,secondaryColor:data.secondaryColor,logoUrl:data.hasUploadedLogo?`${API_URL}/catalog/store/${encodeURIComponent(data.slug)}/logo?v=${encodeURIComponent(data.updatedAt||'')}`:data.logoUrl||''};
+    setLogoOriginal('');setSettings(data);setDesign(next);setBaseline(JSON.stringify(next));
   }
   async function load(auth:string){
     try{const r=await fetch(`${API_URL}/admin/commerce/settings`,{headers:{Authorization:`Bearer ${auth}`},cache:'no-store'});if(!r.ok)throw Error('No se pudo cargar tu tienda. Verificá tu sesión de administrador.');accept(await r.json());setError('');}
@@ -47,13 +49,19 @@ export default function Personalizar(){
   useEffect(()=>{const receive=(e:MessageEvent)=>{if(e.origin===window.location.origin && e.source===frame.current?.contentWindow && e.data?.type==='disenolys-preview-ready')setReady(n=>n+1)};window.addEventListener('message',receive);return()=>window.removeEventListener('message',receive);},[]);
   useEffect(()=>{if(design)frame.current?.contentWindow?.postMessage({type:'disenolys-design',design},window.location.origin);},[design,ready]);
   useEffect(()=>{if(!dirty)return;const warn=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue='';};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[dirty]);
-  function change(key:keyof Design,value:string){setDesign(d=>d?{...d,[key]:value}:d);setMessage('');}
+  function change(key:keyof Design,value:string){if(key==='logoUrl')setLogoOriginal('');setDesign(d=>d?{...d,[key]:value}:d);setMessage('');}
   async function upload(file:File|undefined,kind:'logo'|'cover'='logo'){
     if(!file)return;setError('');
     if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>2*1024*1024){setError('Elegí una imagen PNG, JPG o WebP de hasta 2 MB.');return;}
     setReading(true);
     try{const data=await new Promise<string>((resolve,reject)=>{const r=new FileReader();r.onerror=()=>reject(Error('No se pudo leer el logo.'));r.onload=()=>resolve(String(r.result));r.readAsDataURL(file);});await new Promise<void>((resolve,reject)=>{const img=new Image();img.onload=()=>resolve();img.onerror=()=>reject(Error('La imagen está dañada.'));img.src=data;});if(kind==='cover'){setDesign(d=>d?{...d,coverPreset:'custom',coverUrl:data}:d);setMessage('');}else change('logoUrl',data);}
     catch(e){setError(e instanceof Error?e.message:'No se pudo cargar el logo.');}finally{setReading(false);}
+  }
+  async function removeLogoBackground(){
+    if(!design?.logoUrl)return;setReading(true);setError('');
+    const source=logoOriginal||design.logoUrl;
+    try{const result=await transparentLogo(source,logoTolerance,logoInside);setLogoOriginal(source);setDesign(d=>d?{...d,logoUrl:result}:d);setMessage('Revisá el recorte en la vista previa. Podés deshacerlo antes de guardar.');}
+    catch(e){setError(e instanceof Error?e.message:'No se pudo quitar el fondo.');}finally{setReading(false);}
   }
   async function save(e:FormEvent){
     e.preventDefault();if(!design||!settings)return;setSaving(true);setError('');setMessage('');
@@ -84,11 +92,18 @@ export default function Personalizar(){
     {!design?<div><p>Cargando tu tienda…</p>{error&&<button onClick={()=>load(token)}>Reintentar</button>}</div>:<div className={styles.workspace}>
       <form onSubmit={save} className={styles.editor}><fieldset disabled={saving||reading}>
         <h2>Identidad del comercio</h2><label>Nombre comercial<input required maxLength={120} value={design.name} onChange={e=>change('name',e.target.value)}/></label>
-        <label>Texto de portada<textarea maxLength={180} rows={3} value={design.tagline} onChange={e=>change('tagline',e.target.value)}/></label>
+        <h2>Textos de tu tienda</h2>
+        <label>Título principal de portada<textarea rows={3} maxLength={180} placeholder={`Todo lo que buscás,\nen ${design.name}.`} value={design.heroTitle} onChange={e=>change('heroTitle',e.target.value)}/></label>
+        <small>Podés escribir el título completo y usar saltos de línea. Vacío usa el título automático.</small>
+        <label>Texto del botón principal<input maxLength={40} placeholder="Ver productos" value={design.heroButtonText} onChange={e=>change('heroButtonText',e.target.value)}/></label>
+        <label>Franja de anuncios<input maxLength={160} placeholder={`${design.name.toUpperCase()} · TIENDA ONLINE`} value={design.announcementText} onChange={e=>change('announcementText',e.target.value)}/></label>
+        <label>Descripción de portada<textarea maxLength={180} rows={3} value={design.tagline} onChange={e=>change('tagline',e.target.value)}/></label>
         <label>Logo de tu comercio<input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>void upload(e.target.files?.[0])}/></label><small>PNG, JPG o WebP · Hasta 2 MB</small>
         {design.logoUrl&&<div className={styles.logo}><img src={design.logoUrl} alt="Vista previa del logo"/><button type="button" onClick={()=>{change('logoUrl','');if(fileInput.current)fileInput.current.value='';}}>Quitar logo</button></div>}
+        {design.logoUrl&&<details className={styles.logoTools}><summary>Quitar fondo del logo</summary><p>Detecta fondos uniformes y conserva la transparencia. Para fondos con fotos o texturas, usá una versión PNG sin fondo.</p><label>Sensibilidad: {logoTolerance}<input type="range" min="12" max="100" value={logoTolerance} onChange={e=>setLogoTolerance(Number(e.target.value))}/></label><label className={styles.check}><input type="checkbox" checked={logoInside} onChange={e=>setLogoInside(e.target.checked)}/>Quitar también ese color dentro del logo</label><button type="button" onClick={()=>void removeLogoBackground()}>Detectar y quitar fondo</button>{logoOriginal&&<button type="button" onClick={()=>{change('logoUrl',logoOriginal);setMessage('Recorte deshecho.');}}>Restaurar logo original</button>}</details>}
         <label>O usar una URL del logo<input type="url" placeholder="https://..." value={design.logoUrl.startsWith('data:')?'':design.logoUrl} onChange={e=>change('logoUrl',e.target.value)}/></label>
         <h2>Imagen de portada</h2>
+        <label>Distribución de portada<select value={design.heroLayout} onChange={e=>change('heroLayout',e.target.value)}><option value="split">Texto al lado de la imagen</option><option value="banner">Banner amplio con texto superpuesto</option></select></label>
         <p className={styles.note}>Elegí una foto propia o una imagen de ejemplo. Podés ver el resultado antes de guardar.</p>
         <label>Subir mi portada<input ref={coverInput} type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>void upload(e.target.files?.[0],'cover')}/></label>
         <small>JPG, PNG o WebP · Hasta 2 MB · Recomendamos una foto horizontal. Se adapta al tamaño de pantalla.</small>
@@ -102,7 +117,7 @@ export default function Personalizar(){
         <div className={styles.palettes}>{palettes.map(([name,primaryColor,secondaryColor,backgroundColor])=><button type="button" key={name} onClick={()=>{setDesign({...design,primaryColor,secondaryColor,backgroundColor});setMessage('');}}><i style={{background:primaryColor}}/><i style={{background:secondaryColor}}/><i style={{background:backgroundColor}}/>{name}</button>)}</div>
         <p className={styles.note}>{dirty?'Tenés cambios sin guardar.':'Tu diseño está guardado.'}</p>
         <button className={styles.save} disabled={!dirty} type="submit">{saving?'Guardando…':reading?'Cargando imagen…':'Guardar cambios en mi tienda'}</button>
-        <button type="button" disabled={!dirty} onClick={()=>{setDesign(JSON.parse(baseline));if(coverInput.current)coverInput.current.value='';setError('');setMessage('');if(fileInput.current)fileInput.current.value='';}}>Descartar cambios</button>
+        <button type="button" disabled={!dirty} onClick={()=>{setDesign(JSON.parse(baseline));setLogoOriginal('');if(coverInput.current)coverInput.current.value='';setError('');setMessage('');if(fileInput.current)fileInput.current.value='';}}>Descartar cambios</button>
       </fieldset></form>
       <section className={styles.preview}><div className={styles.toolbar}><strong>Vista previa de tu tienda</strong><div><button type="button" aria-pressed={!mobile} onClick={()=>setMobile(false)}>Computadora</button><button type="button" aria-pressed={mobile} onClick={()=>setMobile(true)}>Celular</button></div></div>
         <div className={styles.frameWrap}><iframe ref={frame} onLoad={()=>setReady(n=>n+1)} title="Vista previa de la tienda real" src={`${storePath}?personalizar=1`} className={mobile?styles.mobile:styles.desktop} tabIndex={-1}/></div>

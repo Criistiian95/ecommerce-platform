@@ -2,5 +2,5 @@ import StorefrontClient from '../storefront-client';
 import styles from './store.module.css';
 
 export default function TiendaPage(){
-  return <main className={`${styles.root} store-shell`}><StorefrontClient/></main>;
+  return <main className={`${styles.root} store-shell storefront-page`}><StorefrontClient/></main>;
 }
