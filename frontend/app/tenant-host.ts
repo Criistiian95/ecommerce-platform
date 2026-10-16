@@ -1,6 +1,6 @@
 export const STOREFRONT_DOMAIN = process.env.NEXT_PUBLIC_STOREFRONT_DOMAIN || 'disenolys.store';
 
-const RESERVED = new Set(['www','api','admin','app','dashboard','mail','email','smtp','ftp','static','assets','cdn','demo','support','ayuda','blog','checkout','tienda','login','panel','status','dev','staging','test']);
+const RESERVED = new Set(['simulador','www','api','admin','app','dashboard','mail','email','smtp','ftp','static','assets','cdn','demo','support','ayuda','blog','checkout','tienda','login','panel','status','dev','staging','test']);
 
 export function tenantSlugFromHost(host: string | null): string | null {
   if (!host) return null;

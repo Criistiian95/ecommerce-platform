@@ -43,7 +43,7 @@ const { tenantSlugFromHost } = tenantSandbox.exports;
 test('single-level merchant subdomains resolve only under Diseñolys', () => {
   assert.equal(tenantSlugFromHost('libreria.disenolys.store'), 'libreria');
   assert.equal(tenantSlugFromHost('MODA-URBANA.disenolys.store:443'), 'moda-urbana');
-  for (const host of ['www.disenolys.store','admin.disenolys.store','disenolys.store','foo.bar.disenolys.store','other.example.com','evil-diseno.disenolys.store.evil.com','foo..disenolys.store']) {
+  for (const host of ['simulador.disenolys.store','www.disenolys.store','admin.disenolys.store','disenolys.store','foo.bar.disenolys.store','other.example.com','evil-diseno.disenolys.store.evil.com','foo..disenolys.store']) {
     assert.equal(tenantSlugFromHost(host), null);
   }
 });

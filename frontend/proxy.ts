@@ -12,6 +12,21 @@ export function proxy(request: NextRequest) {
   const slug = tenantSlugFromHost(host);
   const pathname = request.nextUrl.pathname;
 
+  // The design simulator is a standalone page, separate from merchant stores.
+  if (sub === 'simulador') {
+    if (!['/', '/simulador', '/simulador/', '/simulador.html'].includes(pathname)) {
+      return new NextResponse('Página no disponible', { status: 404 });
+    }
+    const simulatorUrl = request.nextUrl.clone();
+    simulatorUrl.pathname = '/simulador.html';
+    return NextResponse.rewrite(simulatorUrl);
+  }
+  if (!sub && (pathname === '/simulador' || pathname === '/simulador/')) {
+    const simulatorUrl = request.nextUrl.clone();
+    simulatorUrl.pathname = '/simulador.html';
+    return NextResponse.rewrite(simulatorUrl);
+  }
+
   // A reserved or malformed subdomain must not open the default demo storefront.
   if (sub && !slug) {
     if (sub === 'www') return NextResponse.redirect(new URL('https://' + STOREFRONT_DOMAIN + pathname + request.nextUrl.search), 308);
