@@ -49,7 +49,7 @@ test('MySQL: versioned legacy upgrade is repeatable and startup is read-only', a
   await db.onModuleInit();
   assert.equal(statements.some(sql => /ALTER|CREATE|DROP/i.test(sql)), false);
   const [versions] = await original('SELECT version FROM schema_migrations');
-  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font', '010_store_cover']);
+  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font', '010_store_cover', '011_store_identity']);
   const [indexes] = await db.sequelize.query("SHOW INDEX FROM orders WHERE Column_name = 'checkout_key'");
   assert.ok(indexes.some(index => index.Non_unique === 0));
 });
@@ -450,4 +450,15 @@ test('MySQL covers: uploaded image persists, stays tenant scoped, survives color
  await a.commerce.update({active:false});await assert.rejects(()=>pub.getCommerceCover(a.commerce.slug));await a.commerce.update({active:true});
  await svc.updateSettings(a.commerce.id,{coverPreset:'oak'});assert.equal((await svc.getSettings(a.commerce.id)).hasUploadedCover,false);await assert.rejects(()=>pub.getCommerceCover(a.commerce.slug));
  await assert.rejects(()=>svc.updateSettings(a.commerce.id,{coverPreset:'custom'}));
+});
+test('MySQL storefront identity: editable copy and layout persist only for the owner and reset to defaults',async()=>{
+ const {AdminCommerceSettingsService}=require('../dist/catalog/admin-commerce-settings.service');
+ const {PublicCatalogService}=require('../dist/catalog/public-catalog.service');
+ const a=await fixture(),b=await fixture(),svc=new AdminCommerceSettingsService(),pub=new PublicCatalogService();
+ await svc.updateSettings(a.commerce.id,{heroTitle:'Hecho a medida\npara tu hogar',heroButtonText:'Explorar muebles',announcementText:'Trabajos a medida',heroLayout:'banner'});
+ const result=(await pub.getCatalog(a.commerce.slug)).commerce;
+ assert.equal(result.heroTitle,'Hecho a medida\npara tu hogar');assert.equal(result.heroButtonText,'Explorar muebles');assert.equal(result.announcementText,'Trabajos a medida');assert.equal(result.heroLayout,'banner');
+ assert.equal((await pub.getCatalog(b.commerce.slug)).commerce.heroTitle,null);
+ await svc.updateSettings(a.commerce.id,{heroTitle:'',heroButtonText:'',announcementText:'',heroLayout:'split'});
+ const reset=await svc.getSettings(a.commerce.id);assert.equal(reset.heroTitle,null);assert.equal(reset.heroButtonText,null);assert.equal(reset.announcementText,null);assert.equal(reset.heroLayout,'split');
 });

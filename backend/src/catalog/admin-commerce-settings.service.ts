@@ -2,6 +2,10 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { Commerce } from '../database/models/commerce.model';
 
 export type CommerceSettingsInput = {
+  heroTitle?: string | null;
+  heroButtonText?: string | null;
+  announcementText?: string | null;
+  heroLayout?: string;
   backgroundColor?: string;
   coverPreset?: string;
   coverDataBase64?: string;
@@ -83,6 +87,10 @@ export class AdminCommerceSettingsService {
       name: plain.name,
       slug: plain.slug,
       tagline: plain.tagline,
+      heroTitle: plain.heroTitle,
+      heroButtonText: plain.heroButtonText,
+      announcementText: plain.announcementText,
+      heroLayout: plain.heroLayout,
       fontFamily: plain.fontFamily,
       backgroundColor: plain.backgroundColor,
       coverPreset: plain.coverPreset,
@@ -114,6 +122,7 @@ export class AdminCommerceSettingsService {
     const commerce = await Commerce.findByPk(this.requireCommerce(commerceId));
     if (!commerce) throw new NotFoundException('Comercio no encontrado');
 
+    if(input.heroLayout!==undefined && !['split','banner'].includes(input.heroLayout)) throw new BadRequestException('Diseño de portada inválido');
     if(input.fontFamily!==undefined && !['modern','classic','friendly','mono'].includes(input.fontFamily)) throw new BadRequestException('Tipografía inválida');
     this.validateColor(input.backgroundColor, 'El color de fondo');
     if (input.coverPreset !== undefined && !['none','oak','workshop','home','custom'].includes(input.coverPreset)) throw new BadRequestException('Portada inválida');
@@ -123,7 +132,7 @@ export class AdminCommerceSettingsService {
     this.validateColor(input.primaryColor, 'El color principal');
     this.validateColor(input.secondaryColor, 'El color secundario');
 
-    for (const [key,limit] of [['name',120],['tagline',180],['logoUrl',500]] as const) {
+    for (const [key,limit] of [['heroTitle',180],['heroButtonText',40],['announcementText',160],['name',120],['tagline',180],['logoUrl',500]] as const) {
       const value=input[key];
       if(value!==undefined && value!==null && (typeof value!=='string' || value.length>limit)) throw new BadRequestException('Texto inválido o demasiado largo');
     }
@@ -152,6 +161,10 @@ export class AdminCommerceSettingsService {
       throw new BadRequestException('El email para avisos de venta no es válido');
     }
     await commerce.update({
+      ...(input.heroTitle !== undefined ? {heroTitle: input.heroTitle?.trim() || null} : {}),
+      ...(input.heroButtonText !== undefined ? {heroButtonText: input.heroButtonText?.trim() || null} : {}),
+      ...(input.announcementText !== undefined ? {announcementText: input.announcementText?.trim() || null} : {}),
+      ...(input.heroLayout !== undefined ? {heroLayout: input.heroLayout} : {}),
       ...(input.backgroundColor !== undefined ? { backgroundColor: input.backgroundColor } : {}),
       ...(input.coverPreset !== undefined ? { coverPreset: input.coverPreset } : {}),
       ...(cover ? { coverData: cover.buffer, coverMimeType: cover.mime } : {}),

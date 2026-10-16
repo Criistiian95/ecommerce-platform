@@ -107,3 +107,33 @@ button,input,textarea,select{font:inherit}button,a,input,textarea,select{-webkit
 .commerce-theme .store-hero.without-cover{grid-template-columns:1fr;min-height:340px}
 .commerce-theme .store-hero.without-cover .hero-copy{max-width:850px}
 @media(max-width:760px){.commerce-theme .store-hero.with-cover{grid-template-columns:1fr;gap:24px}.hero-cover{height:280px;border-radius:18px}}
+
+/* Edge-to-edge merchant identity; the catalog retains a readable content width. */
+.store-shell.storefront-page{max-width:none;width:100%;margin:0;padding:0;min-height:100vh}
+.storefront-page .commerce-theme{min-height:100vh;width:100%;background:var(--store-background,#f7f9fd)}
+.storefront-page .store-content{max-width:1240px;margin:0 auto;padding:0 32px}
+.storefront-page .store-masthead{width:100%;background:var(--accent);color:var(--on-accent,#fff)}
+.storefront-page .store-announcement{color:inherit;border-color:currentColor;font-size:11px;border-bottom:1px solid color-mix(in srgb,currentColor 16%,transparent)}
+.store-shell.storefront-page .store-header{max-width:1240px;margin:auto;padding:18px 32px;display:flex;align-items:center;justify-content:space-between;background:transparent;border-radius:0;box-shadow:none}
+.storefront-page .store-identity{min-width:0;color:inherit}.storefront-page .store-identity>div{min-width:0}.storefront-page .store-brand{overflow-wrap:anywhere}
+.storefront-page .store-identity small{color:inherit;opacity:.85;display:block;max-width:370px;line-height:1.4}
+.storefront-page .store-logo{width:auto;max-width:140px;height:78px;object-fit:contain;background:transparent;border:0;border-radius:0;padding:0;flex-shrink:0}
+.storefront-page .store-monogram{color:inherit;background:transparent;border:1px solid currentColor}
+.storefront-page .store-header-actions{flex-shrink:0;display:flex;align-items:center}
+.storefront-page .store-cart-icon{display:inline-flex;align-items:center;gap:5px;min-height:44px;min-width:44px;justify-content:center;border:1px solid color-mix(in srgb,currentColor 40%,transparent);border-radius:8px;color:inherit;padding:8px}
+.storefront-page .store-menu{max-width:1240px;margin:auto;display:flex;gap:28px;padding:0 32px 16px;overflow-x:auto;white-space:nowrap;font-size:13px}
+.store-menu a{padding:7px 0;border-bottom:2px solid transparent}.store-menu a:hover,.store-menu a[aria-current=true]{border-color:currentColor}
+.storefront-page .store-cart-icon:focus-visible,.store-menu a:focus-visible{outline:2px solid currentColor;outline-offset:3px}
+.store-shell.storefront-page .commerce-theme .store-hero{border:0;border-radius:0;background:transparent;margin-top:0;padding:52px 0;overflow:visible}
+.storefront-page .store-hero h1{white-space:pre-line;overflow-wrap:anywhere}
+.storefront-page .store-hero p{color:var(--ink)}
+.store-shell.storefront-page .hero-banner.with-cover{position:relative;display:flex;min-height:520px;margin:0 calc(50% - 50vw);padding:64px max(32px,calc((100vw - 1176px)/2));isolation:isolate;overflow:hidden}
+.storefront-page .hero-banner .hero-cover{position:absolute;inset:0;width:100%;height:100%;border-radius:0;z-index:-2}
+.storefront-page .hero-banner:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#000b,#0007 55%,#0003);z-index:-1}
+.store-shell.storefront-page .hero-banner .hero-copy{max-width:650px;color:white}.store-shell.storefront-page .hero-banner .hero-copy p,.store-shell.storefront-page .hero-banner .eyebrow,.storefront-page .hero-banner h1 em{color:white}
+.storefront-page .store-empty{background:transparent;border-color:color-mix(in srgb,var(--ink) 20%,transparent)}
+.store-loading{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fafafa;color:#53606f;gap:12px}.loading-shape{width:64px;height:5px;border-radius:4px;background:#d6dce2}
+.storefront-page .btn.primary{background:var(--accent);color:var(--on-accent,#fff)}
+@media(max-width:760px){.storefront-page .store-content{padding:0 20px}.store-shell.storefront-page .store-header{padding:16px 20px;gap:12px}.storefront-page .store-logo{height:62px;max-width:85px}.storefront-page .store-brand{font-size:17px}.storefront-page .store-identity small{display:none}.storefront-page .store-header-actions{gap:8px}.storefront-page .store-menu{gap:22px;padding:0 20px 12px}.store-shell.storefront-page .store-hero{padding:32px 0}.store-shell.storefront-page .store-hero h1{font-size:clamp(32px,9vw,44px)}.store-shell.storefront-page .hero-banner.with-cover{min-height:440px;padding:40px 20px}.storefront-page .hero-banner:after{background:#0009}}
+
+.store-shell.storefront-page{overflow-x:clip}

@@ -1,5 +1,6 @@
 'use client';
 
+import { onColor } from './store-colors';
 import { storeFont } from './store-fonts';
 import { useEffect } from 'react';
 import { API_URL, StoreCatalog } from './storefront-types';
@@ -17,6 +18,7 @@ export function CommerceThemeProvider({ children }:{ children:React.ReactNode })
         const root=document.documentElement;
         root.style.setProperty('--store-font',storeFont(catalog.commerce.fontFamily));
         root.style.setProperty('--store-background',catalog.commerce.backgroundColor || '#f7f9fd');
+        root.style.setProperty('--on-accent',onColor(catalog.commerce.primaryColor || '#245ce6'));
         root.style.setProperty('--accent',catalog.commerce.primaryColor || '#245ce6');
         root.style.setProperty('--ink',catalog.commerce.secondaryColor || '#172238');
       })
@@ -27,6 +29,7 @@ export function CommerceThemeProvider({ children }:{ children:React.ReactNode })
       const root=document.documentElement;
       root.style.removeProperty('--store-font');
       root.style.removeProperty('--store-background');
+      root.style.removeProperty('--on-accent');
       root.style.removeProperty('--accent');
       root.style.removeProperty('--ink');
     };

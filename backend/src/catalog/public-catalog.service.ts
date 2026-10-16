@@ -9,7 +9,7 @@ export class PublicCatalogService {
     const commerce = await Commerce.findOne({
       where: { slug: commerceSlug, active: true },
       attributes: [
-        'backgroundColor','coverPreset','id','fontFamily','updatedAt','name','slug','tagline','primaryColor','secondaryColor',
+        'heroTitle','heroButtonText','announcementText','heroLayout','backgroundColor','coverPreset','id','fontFamily','updatedAt','name','slug','tagline','primaryColor','secondaryColor',
         'logoUrl','logoMimeType','whatsapp','contactEmail','contactPhone',
         'address','businessHours','pickupEnabled','shippingEnabled',
         [Commerce.sequelize!.literal('(cover_data IS NOT NULL)'), 'hasUploadedCover'],
@@ -82,6 +82,10 @@ export class PublicCatalogService {
         name: commerce.name,
         slug: commerce.slug,
         tagline: commerce.tagline,
+        heroTitle: commerce.heroTitle,
+        heroButtonText: commerce.heroButtonText,
+        announcementText: commerce.announcementText,
+        heroLayout: commerce.heroLayout,
         fontFamily: commerce.fontFamily,
         backgroundColor: commerce.backgroundColor,
         coverPreset: commerce.coverPreset,

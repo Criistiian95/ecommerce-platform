@@ -32,3 +32,7 @@ test('cover validation rejects unsafe types, invalid palettes, missing files and
  mock.method(Commerce,'findByPk',async()=>commerce());const svc=new AdminCommerceSettingsService();
  for(const input of [{backgroundColor:'red'},{coverPreset:'unknown'},{coverPreset:'custom'},{coverPreset:'custom',coverDataBase64:'PHN2Zz4=',coverMimeType:'image/svg+xml'},{coverPreset:'custom',coverDataBase64:'PHN2Zz4=',coverMimeType:'image/png'},{coverPreset:'custom',coverDataBase64:'A'.repeat(2800001),coverMimeType:'image/png'}]) await assert.rejects(()=>svc.updateSettings('a',input));
 });
+test('storefront text rejects overlong values, nontext values and unknown layouts',async()=>{
+ mock.method(Commerce,'findByPk',async()=>commerce());const svc=new AdminCommerceSettingsService();
+ for(const input of [{heroTitle:'a'.repeat(181)},{heroTitle:42},{heroButtonText:'a'.repeat(41)},{announcementText:'a'.repeat(161)},{heroLayout:'unsafe'}]) await assert.rejects(()=>svc.updateSettings('a',input));
+});

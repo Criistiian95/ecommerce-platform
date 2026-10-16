@@ -25,6 +25,10 @@ export type StoreCatalog = {
     slug: string;
     tagline?: string | null;
     fontFamily?: string;
+    heroTitle?: string | null;
+    heroButtonText?: string | null;
+    announcementText?: string | null;
+    heroLayout?: string;
     backgroundColor?: string;
     coverPreset?: string;
     hasUploadedCover?: boolean;
