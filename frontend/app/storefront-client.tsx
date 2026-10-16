@@ -1,4 +1,5 @@
 'use client';
+import { storeFont } from './store-fonts';
 import {CSSProperties,useEffect,useState} from 'react';
 import Link from './store-link';
 import {useCart} from './cart-context';
@@ -20,11 +21,21 @@ export default function StorefrontClient({demoMode=false}:{demoMode?:boolean}){
       const d=event.data.design;
       if(!d || typeof d.name!=='string' || d.name.length>120 || typeof d.tagline!=='string' || d.tagline.length>180 || !/^#[0-9a-f]{6}$/i.test(d.primaryColor) || !/^#[0-9a-f]{6}$/i.test(d.secondaryColor)) return;
       const logo=typeof d.logoUrl==='string' && /^(https?:\/\/|data:image\/(png|jpeg|webp);base64,)/.test(d.logoUrl) ? d.logoUrl : null;
-      setDesignPreview({name:d.name,tagline:d.tagline,primaryColor:d.primaryColor,secondaryColor:d.secondaryColor,logoUrl:logo,hasUploadedLogo:false});
+      setDesignPreview({name:d.name,tagline:d.tagline,primaryColor:d.primaryColor,secondaryColor:d.secondaryColor,fontFamily:d.fontFamily,logoUrl:logo,hasUploadedLogo:false});
     };
+    const blockActions=(event:Event)=>{
+      const target=event.target instanceof Element?event.target.closest('a,button,form'):null;
+      if(!target)return;
+      if(target instanceof HTMLAnchorElement && target.getAttribute('href')==='#catalogo')return;
+      // Filters and sort remain usable; cart and checkout actions stay disabled.
+      if(target.closest('.category-filters,.catalog-toolbar'))return;
+      event.preventDefault();event.stopPropagation();
+    };
+    document.addEventListener('click',blockActions,true);
+    document.addEventListener('submit',blockActions,true);
     window.addEventListener('message',receive);
     window.parent.postMessage({type:'disenolys-preview-ready'},window.location.origin);
-    return ()=>window.removeEventListener('message',receive);
+    return ()=>{window.removeEventListener('message',receive);document.removeEventListener('click',blockActions,true);document.removeEventListener('submit',blockActions,true);};
   },[]);
   const [error,setError]=useState('');
   const [query,setQuery]=useState('');
@@ -48,6 +59,7 @@ export default function StorefrontClient({demoMode=false}:{demoMode?:boolean}){
     : commerce?.logoUrl ?? '';
   const whatsappNumber=(commerce?.whatsapp ?? '').replace(/\D/g,'');
   const themeStyle={
+    '--store-font':storeFont(commerce?.fontFamily),
     '--accent':commerce?.primaryColor || '#245ce6',
     '--ink':commerce?.secondaryColor || '#172238',
   } as CSSProperties;

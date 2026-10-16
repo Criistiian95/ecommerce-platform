@@ -4,6 +4,7 @@ import { Commerce } from '../database/models/commerce.model';
 type CommerceSettingsInput = {
   name?: string;
   tagline?: string | null;
+  fontFamily?: string;
   primaryColor?: string;
   secondaryColor?: string;
   logoUrl?: string | null;
@@ -67,6 +68,7 @@ export class AdminCommerceSettingsService {
       name: plain.name,
       slug: plain.slug,
       tagline: plain.tagline,
+      fontFamily: plain.fontFamily,
       primaryColor: plain.primaryColor,
       secondaryColor: plain.secondaryColor,
       logoUrl: plain.logoUrl,
@@ -94,6 +96,7 @@ export class AdminCommerceSettingsService {
     const commerce = await Commerce.findByPk(this.requireCommerce(commerceId));
     if (!commerce) throw new NotFoundException('Comercio no encontrado');
 
+    if(input.fontFamily!==undefined && !['modern','classic','friendly','mono'].includes(input.fontFamily)) throw new BadRequestException('Tipografía inválida');
     this.validateColor(input.primaryColor, 'El color principal');
     this.validateColor(input.secondaryColor, 'El color secundario');
 
@@ -126,6 +129,7 @@ export class AdminCommerceSettingsService {
       throw new BadRequestException('El email para avisos de venta no es válido');
     }
     await commerce.update({
+      ...(input.fontFamily!==undefined ? {fontFamily:input.fontFamily} : {}),
       ...(input.salesEmail !== undefined ? { salesEmail: input.salesEmail?.trim().toLowerCase() || null } : {}),
       ...(name !== undefined ? { name } : {}),
       ...(input.tagline !== undefined ? { tagline: input.tagline?.trim() || null } : {}),

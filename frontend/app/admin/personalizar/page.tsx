@@ -5,7 +5,7 @@ import styles from './personalizar.module.css';
 import { API_URL } from '../../storefront-types';
 import { useStorefront } from '../../storefront-context';
 
-type Design={name:string;tagline:string;primaryColor:string;secondaryColor:string;logoUrl:string};
+type Design={fontFamily:string;name:string;tagline:string;primaryColor:string;secondaryColor:string;logoUrl:string};
 type Settings=Design & {slug:string;hasUploadedLogo:boolean;updatedAt?:string};
 const palettes=[['Bosque','#237059','#172522'],['Madera','#865735','#33291f'],['Océano','#245ce6','#172238'],['Ciruela','#793e76','#302136']];
 export default function Personalizar(){
@@ -21,7 +21,7 @@ export default function Personalizar(){
   const [message,setMessage]=useState('');const [error,setError]=useState('');
   const dirty=!!design && JSON.stringify(design)!==baseline;
   function accept(data:Settings){
-    const next={name:data.name,tagline:data.tagline||'',primaryColor:data.primaryColor,secondaryColor:data.secondaryColor,logoUrl:data.hasUploadedLogo?`${API_URL}/catalog/store/${encodeURIComponent(data.slug)}/logo?v=${encodeURIComponent(data.updatedAt||'')}`:data.logoUrl||''};
+    const next={fontFamily:data.fontFamily||'modern',name:data.name,tagline:data.tagline||'',primaryColor:data.primaryColor,secondaryColor:data.secondaryColor,logoUrl:data.hasUploadedLogo?`${API_URL}/catalog/store/${encodeURIComponent(data.slug)}/logo?v=${encodeURIComponent(data.updatedAt||'')}`:data.logoUrl||''};
     setSettings(data);setDesign(next);setBaseline(JSON.stringify(next));
   }
   async function load(auth:string){
@@ -67,6 +67,7 @@ export default function Personalizar(){
         <label>Logo de tu comercio<input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>void upload(e.target.files?.[0])}/></label><small>PNG, JPG o WebP · Hasta 2 MB</small>
         {design.logoUrl&&<div className={styles.logo}><img src={design.logoUrl} alt="Vista previa del logo"/><button type="button" onClick={()=>{change('logoUrl','');if(fileInput.current)fileInput.current.value='';}}>Quitar logo</button></div>}
         <label>O usar una URL del logo<input type="url" placeholder="https://..." value={design.logoUrl.startsWith('data:')?'':design.logoUrl} onChange={e=>change('logoUrl',e.target.value)}/></label>
+        <label>Tipo de letra<select value={design.fontFamily} onChange={e=>change('fontFamily',e.target.value)}><option value="modern">Moderna · Arial</option><option value="classic">Clásica · Georgia</option><option value="friendly">Cercana · Trebuchet</option><option value="mono">Monoespaciada · Courier</option></select></label>
         <div className={styles.colors}><label>Color principal<input type="color" value={design.primaryColor} onChange={e=>change('primaryColor',e.target.value)}/></label><label>Color del texto<input type="color" value={design.secondaryColor} onChange={e=>change('secondaryColor',e.target.value)}/></label></div>
         <div className={styles.palettes}>{palettes.map(([name,primaryColor,secondaryColor])=><button type="button" key={name} onClick={()=>{setDesign({...design,primaryColor,secondaryColor});setMessage('');}}><i style={{background:primaryColor}}/>{name}</button>)}</div>
         <p className={styles.note}>{dirty?'Tenés cambios sin guardar.':'Tu diseño está guardado.'}</p>
@@ -75,7 +76,7 @@ export default function Personalizar(){
       </fieldset></form>
       <section className={styles.preview}><div className={styles.toolbar}><strong>Vista previa de tu tienda</strong><div><button type="button" aria-pressed={!mobile} onClick={()=>setMobile(false)}>Computadora</button><button type="button" aria-pressed={mobile} onClick={()=>setMobile(true)}>Celular</button></div></div>
         <div className={styles.frameWrap}><iframe ref={frame} onLoad={()=>setReady(n=>n+1)} title="Vista previa de la tienda real" src={`${storePath}?personalizar=1`} className={mobile?styles.mobile:styles.desktop} tabIndex={-1}/></div>
-        <p className={styles.note}>Vista previa sin compras. Los productos se administran desde el panel.</p><a href={storePath} target="_blank" rel="noreferrer">Abrir mi tienda publicada ↗</a>
+        <p className={styles.note}>Desplazá la vista previa para ver artículos y botones. Los botones de compra están desactivados en esta vista.</p><a href={storePath} target="_blank" rel="noreferrer">Abrir mi tienda publicada ↗</a>
       </section>
     </div>}
   </main>;

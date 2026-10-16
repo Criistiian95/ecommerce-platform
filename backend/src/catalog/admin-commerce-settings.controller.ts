@@ -21,7 +21,8 @@ export class AdminCommerceSettingsController {
     @Body() body: {
       name?: string;
       tagline?: string | null;
-      primaryColor?: string;
+      fontFamily?: string;
+  primaryColor?: string;
       secondaryColor?: string;
       logoUrl?: string | null;
       logoDataBase64?: string | null;
