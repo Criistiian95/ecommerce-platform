@@ -22,7 +22,7 @@ export default function LoginPage() {
         body: JSON.stringify({
           email: form.get('email'),
           password: form.get('password'),
-          ...(isTenantDomain ? { commerceSlug: slug } : {}),
+          commerceSlug: isTenantDomain ? slug : String(form.get('commerceSlug') || '').trim(),
         }),
       },
     );
@@ -48,6 +48,7 @@ export default function LoginPage() {
       <h1>Administrar tienda</h1>
       <p>Acceso para administradores del comercio.</p>
       <form onSubmit={submit}>
+        {!isTenantDomain && <label className="field">Identificador de tu tienda<input name="commerceSlug" placeholder="cfz-carpinteria"/><small>Completalo si administrás más de una tienda con el mismo email.</small></label>}
         <label className="field">
           Email
           <input name="email" type="email" required />
@@ -58,6 +59,7 @@ export default function LoginPage() {
         </label>
         <button className="btn primary" type="submit">Ingresar</button>
       </form>
+      <p><Link href="/registro">Crear mi tienda</Link></p>
       <p><Link href="/recuperar">Olvidé mi contraseña</Link></p>
       {message && <p>{message}</p>}
     </main>

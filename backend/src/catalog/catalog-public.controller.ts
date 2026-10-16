@@ -27,7 +27,7 @@ export class CatalogPublicController {
   async commerceLogo(@Param('slug') slug: string, @Res() res: Response) {
     const logo = await this.publicCatalog.getCommerceLogo(slug);
     res.setHeader('Content-Type', logo.mimeType);
-    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Cache-Control', 'no-cache, max-age=0, must-revalidate');
     res.send(logo.data);
   }
 

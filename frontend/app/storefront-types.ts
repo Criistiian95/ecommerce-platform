@@ -20,6 +20,7 @@ export type StoreProduct = {
 
 export type StoreCatalog = {
   commerce: {
+    updatedAt?: string;
     name: string;
     slug: string;
     tagline?: string | null;

@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import AdminStoreLink from './store-link';
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
@@ -308,6 +309,7 @@ export default function AdminPage() {
           <a className="admin-nav-link" href="/admin/pedidos">Pedidos</a>
           <a className="admin-nav-link" href="/admin/clientes">Clientes</a>
           <a className="admin-nav-link" href="/admin/configuracion">Configuración</a>
+          <Link className="admin-nav-link" href="/admin/personalizar">Personalizar mi tienda</Link>
           <AdminStoreLink />
         </nav>
       </header>

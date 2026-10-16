@@ -12,6 +12,20 @@ export default function StorefrontClient({demoMode=false}:{demoMode?:boolean}){
   const {totalItems}=useCart();
   const {user}=useCustomerAuth();
   const [catalog,setCatalog]=useState<StoreCatalog|null>(null);
+  const [designPreview,setDesignPreview]=useState<Partial<StoreCatalog['commerce']>>({});
+  useEffect(()=>{
+    if(window.parent===window || new URLSearchParams(window.location.search).get('personalizar')!=='1') return;
+    const receive=(event:MessageEvent)=>{
+      if(event.origin!==window.location.origin || event.source!==window.parent || event.data?.type!=='disenolys-design') return;
+      const d=event.data.design;
+      if(!d || typeof d.name!=='string' || d.name.length>120 || typeof d.tagline!=='string' || d.tagline.length>180 || !/^#[0-9a-f]{6}$/i.test(d.primaryColor) || !/^#[0-9a-f]{6}$/i.test(d.secondaryColor)) return;
+      const logo=typeof d.logoUrl==='string' && /^(https?:\/\/|data:image\/(png|jpeg|webp);base64,)/.test(d.logoUrl) ? d.logoUrl : null;
+      setDesignPreview({name:d.name,tagline:d.tagline,primaryColor:d.primaryColor,secondaryColor:d.secondaryColor,logoUrl:logo,hasUploadedLogo:false});
+    };
+    window.addEventListener('message',receive);
+    window.parent.postMessage({type:'disenolys-preview-ready'},window.location.origin);
+    return ()=>window.removeEventListener('message',receive);
+  },[]);
   const [error,setError]=useState('');
   const [query,setQuery]=useState('');
   const [category,setCategory]=useState('');
@@ -24,13 +38,13 @@ export default function StorefrontClient({demoMode=false}:{demoMode?:boolean}){
       .then(async r=>{if(!r.ok)throw new Error();setCatalog(await r.json());})
       .catch(e=>{if(e.name!=='AbortError')setError('No pudimos cargar los productos. Intentá nuevamente.');});
     return ()=>controller.abort();
-  },[attempt]);
+  },[attempt,COMMERCE_SLUG]);
   const normalize=(value:string)=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-  const commerce=catalog?.commerce;
+  const commerce=catalog?.commerce ? {...catalog.commerce, ...designPreview} : undefined;
   const brandName=commerce?.name ?? 'Tienda Demo';
   const tagline=commerce?.tagline ?? 'E-commerce para tu negocio';
   const logoSrc=commerce?.hasUploadedLogo
-    ? `${API_URL}/catalog/store/${COMMERCE_SLUG}/logo`
+    ? `${API_URL}/catalog/store/${COMMERCE_SLUG}/logo?v=${encodeURIComponent(commerce.updatedAt || "")}`
     : commerce?.logoUrl ?? '';
   const whatsappNumber=(commerce?.whatsapp ?? '').replace(/\D/g,'');
   const themeStyle={

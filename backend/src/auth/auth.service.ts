@@ -230,6 +230,29 @@ export class AuthService {
     }
   }
 
+  async registerCommerce(input: {commerceName:string;commerceSlug:string;adminName:string;email:string;password:string}) {
+    const text=(value:unknown,max:number)=> typeof value==='string' && value.trim().length<=max ? value.trim() : '';
+    const name=text(input?.commerceName,120), slug=text(input?.commerceSlug,63).toLowerCase();
+    const adminName=text(input?.adminName,120), email=text(input?.email,190).toLowerCase();
+    const password=typeof input?.password==='string'?input.password:'';
+    const reserved=new Set(['www','api','admin','app','dashboard','mail','email','smtp','ftp','static','assets','cdn','demo','support','ayuda','blog','checkout','tienda','login','panel','status','dev','staging','test','simulador','registro']);
+    if(!name || !adminName || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new BadRequestException('Completá nombre, administrador y un email válido');
+    if(!/^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])$/.test(slug) || reserved.has(slug)) throw new BadRequestException('Elegí un identificador de 3 a 63 letras minúsculas, números o guiones');
+    if(password.length<10 || Buffer.byteLength(password,'utf8')>72) throw new BadRequestException('Usá una contraseña de al menos 10 caracteres y como máximo 72 bytes');
+    if(await Commerce.findOne({where:{slug},attributes:['id']})) throw new ConflictException('Ese identificador de tienda ya está en uso');
+    const passwordHash=await bcrypt.hash(password,12);
+    try {
+      return await this.db.sequelize.transaction(async transaction=>{
+        const commerce=await Commerce.create({name,slug,active:true},{transaction});
+        await User.create({commerceId:commerce.id,name:adminName,email,passwordHash,role:'admin',active:true},{transaction});
+        return {ok:true,commerce:{name,slug}};
+      });
+    } catch(error) {
+      if((error as Error).name==='SequelizeUniqueConstraintError') throw new ConflictException('Ese identificador de tienda ya está en uso');
+      throw error;
+    }
+  }
+
   async createInitialAdmin(input: {
     commerceName: string;
     commerceSlug: string;

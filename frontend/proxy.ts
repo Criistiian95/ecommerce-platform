@@ -20,7 +20,7 @@ export function proxy(request: NextRequest) {
   if (!slug || ADMIN_ROUTES.test(pathname)) return NextResponse.next();
 
   // Demo and other company-level pages live only on the root domain.
-  if (pathname === '/demo' || pathname.startsWith('/demo/')) {
+  if (pathname === '/registro' || pathname === '/demo' || pathname.startsWith('/demo/')) {
     return NextResponse.redirect(new URL('https://' + STOREFRONT_DOMAIN + pathname), 307);
   }
   const url = request.nextUrl.clone();

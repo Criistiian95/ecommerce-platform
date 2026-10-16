@@ -9,7 +9,7 @@ export class PublicCatalogService {
     const commerce = await Commerce.findOne({
       where: { slug: commerceSlug, active: true },
       attributes: [
-        'id','name','slug','tagline','primaryColor','secondaryColor',
+        'id','updatedAt','name','slug','tagline','primaryColor','secondaryColor',
         'logoUrl','logoMimeType','whatsapp','contactEmail','contactPhone',
         'address','businessHours','pickupEnabled','shippingEnabled',
         [Commerce.sequelize!.literal('(logo_data IS NOT NULL)'), 'hasUploadedLogo'],
@@ -77,6 +77,7 @@ export class PublicCatalogService {
 
     return {
       commerce: {
+        updatedAt: commerce.get('updatedAt'),
         name: commerce.name,
         slug: commerce.slug,
         tagline: commerce.tagline,

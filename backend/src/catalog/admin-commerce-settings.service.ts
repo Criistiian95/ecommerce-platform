@@ -28,6 +28,8 @@ export class AdminCommerceSettingsService {
   }
 
   private decodeLogo(input: CommerceSettingsInput) {
+    if(input.logoDataBase64 != null && typeof input.logoDataBase64!=='string') throw new BadRequestException('Logo inválido');
+    if(input.logoMimeType != null && typeof input.logoMimeType!=='string') throw new BadRequestException('Formato inválido');
     const base64 = input.logoDataBase64?.trim();
     const mime = input.logoMimeType?.trim().toLowerCase();
 
@@ -60,6 +62,7 @@ export class AdminCommerceSettingsService {
     delete plain.logoData;
 
     return {
+      updatedAt: plain.updatedAt,
       id: plain.id,
       name: plain.name,
       slug: plain.slug,
@@ -87,12 +90,21 @@ export class AdminCommerceSettingsService {
   }
 
   async updateSettings(commerceId: string | null, input: CommerceSettingsInput) {
+    if (!input || typeof input !== 'object') throw new BadRequestException('Configuración inválida');
     const commerce = await Commerce.findByPk(this.requireCommerce(commerceId));
     if (!commerce) throw new NotFoundException('Comercio no encontrado');
 
     this.validateColor(input.primaryColor, 'El color principal');
     this.validateColor(input.secondaryColor, 'El color secundario');
 
+    for (const [key,limit] of [['name',120],['tagline',180],['logoUrl',500]] as const) {
+      const value=input[key];
+      if(value!==undefined && value!==null && (typeof value!=='string' || value.length>limit)) throw new BadRequestException('Texto inválido o demasiado largo');
+    }
+    if(input.logoUrl) {
+      try { const url=new URL(input.logoUrl); if(!['https:','http:'].includes(url.protocol)) throw new Error(); }
+      catch { throw new BadRequestException('La URL del logo debe comenzar con https:// o http://'); }
+    }
     const logo = this.decodeLogo(input);
     const name = input.name?.trim();
     if (input.name !== undefined && !name) {
@@ -123,7 +135,7 @@ export class AdminCommerceSettingsService {
       ...(logo
         ? { logoUrl: null, logoData: logo.buffer, logoMimeType: logo.mime }
         : {}),
-      ...(input.clearUploadedLogo ? { logoData: null, logoMimeType: null } : {}),
+      ...(!logo && (input.clearUploadedLogo || input.logoUrl?.trim()) ? { logoData: null, logoMimeType: null } : {}),
       ...(input.whatsapp !== undefined ? { whatsapp: input.whatsapp?.trim() || null } : {}),
       ...(input.contactEmail !== undefined ? { contactEmail: input.contactEmail?.trim() || null } : {}),
       ...(input.contactPhone !== undefined ? { contactPhone: input.contactPhone?.trim() || null } : {}),
