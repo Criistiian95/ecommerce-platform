@@ -409,3 +409,28 @@ test('MySQL merchant settings: private destination validation and disabling futu
   await settings.updateSettings(f.commerce.id,{salesEmail:''});
   assert.equal((await settings.getSettings(f.commerce.id)).salesEmail,null);
 });
+
+test('MySQL merchant registration: one owner on concurrent registration and rollback on owner failure',async()=>{
+ const {AuthService}=require('../dist/auth/auth.service');const auth=new AuthService(db);
+ const input={commerceName:'Registration test',commerceSlug:randomUUID(),adminName:'Owner',email:'owner@example.com',password:'long-test-password'};
+ const results=await Promise.allSettled([auth.registerCommerce(input),auth.registerCommerce(input)]);
+ assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
+ const commerce=await Commerce.findOne({where:{slug:input.commerceSlug}});
+ assert.equal(await User.count({where:{commerceId:commerce.id,role:'admin'}}),1);
+ const failedSlug=randomUUID();mock.method(User,'create',async()=>{throw new Error('owner insertion failed')});
+ await assert.rejects(()=>auth.registerCommerce({...input,commerceSlug:failedSlug}),/owner insertion failed/);
+ assert.equal(await Commerce.count({where:{slug:failedSlug}}),0);
+});
+test('MySQL design: branding and logo persist to the public catalog of only the owning commerce',async()=>{
+ const {AdminCommerceSettingsService}=require('../dist/catalog/admin-commerce-settings.service');
+ const {PublicCatalogService}=require('../dist/catalog/public-catalog.service');
+ const a=await fixture(),b=await fixture(),svc=new AdminCommerceSettingsService(),pub=new PublicCatalogService();
+ const image=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
+ await svc.updateSettings(a.commerce.id,{name:'My design',tagline:'My headline',primaryColor:'#865735',logoDataBase64:image.toString('base64'),logoMimeType:'image/png'});
+ const catalog=await pub.getCatalog(a.commerce.slug);assert.equal(catalog.commerce.name,'My design');assert.equal(catalog.commerce.primaryColor,'#865735');assert.equal(catalog.commerce.hasUploadedLogo,true);assert.ok(catalog.commerce.updatedAt);
+ assert.deepEqual((await pub.getCommerceLogo(a.commerce.slug)).data,image);
+ assert.equal((await pub.getCatalog(b.commerce.slug)).commerce.name,'Test');
+ await svc.updateSettings(a.commerce.id,{logoUrl:'https://example.com/new.png'});
+ assert.equal((await pub.getCatalog(a.commerce.slug)).commerce.hasUploadedLogo,false);
+ await assert.rejects(()=>pub.getCommerceLogo(a.commerce.slug));
+});

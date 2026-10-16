@@ -8,6 +8,7 @@ export default function HomePage() {
       <nav className={styles.links} aria-label="Navegación">
         <a href="#funciones">Funciones</a>
         <Link href="/demo">Ver demostración</Link>
+        <Link href="/registro">Crear mi tienda</Link>
         <Link className={styles.button} href="/contacto">Solicitá información</Link>
       </nav>
     </header>
