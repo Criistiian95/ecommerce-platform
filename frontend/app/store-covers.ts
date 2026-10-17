@@ -29,7 +29,8 @@ export const storeCovers: StoreCover[] = [
   { id:'workshop', name:'Taller artesanal', group:'Hogar y decoración', src:'/covers/workshop.webp', thumbnail:'/covers/workshop.webp' },
   { id:'home', name:'Calidez de hogar', group:'Hogar y decoración', src:'/covers/home.webp', thumbnail:'/covers/home.webp' },
   photoCover('fashion','Tienda de ropa','Moda','photo-1603400521630-9f2de124b33b','clothing-racks-with-neutral-toned-garments-mwa_nzFpnJw'),
-  photoCover('shoes','Calzado urbano','Moda','photo-1542291026-7eec264c27ff','white-adidas-low-top-sneakers-JM-qKEd1GMI'),
+  // Generic unbranded sneaker: no manufacturer logos or identifiable trademarks.
+  { id:'shoes', name:'Calzado urbano', group:'Moda', src:'https://assets.lummi.ai/assets/QmQSKsNtxfH6FpaRLKa4c4Rrg2ZmUwAR6wHCC9qqzbQMdL?auto=format&w=1500', thumbnail:'https://assets.lummi.ai/assets/QmQSKsNtxfH6FpaRLKa4c4Rrg2ZmUwAR6wHCC9qqzbQMdL?auto=format&w=420', creditUrl:'https://www.lummi.ai/photo/minimalist-white-sneakers-0mgsi' },
   photoCover('sports','Deporte y fitness','Moda','photo-1767552273968-da3464e2986c','gym-equipment-with-weights-and-machines-UpJkZIv4fM4'),
   photoCover('phones','Celulares','Tecnología','photo-1753108431859-19eb29905bbb','several-modern-smartphones-are-laid-out-UXk-P20Kvbw'),
   photoCover('computing','Computación y gaming','Tecnología','photo-1760999896198-b7e780e42500','gaming-setup-with-laptop-keyboard-and-rgb-lighting-Y-05vRRw3ng'),
