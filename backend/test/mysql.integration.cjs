@@ -49,7 +49,7 @@ test('MySQL: versioned legacy upgrade is repeatable and startup is read-only', a
   await db.onModuleInit();
   assert.equal(statements.some(sql => /ALTER|CREATE|DROP/i.test(sql)), false);
   const [versions] = await original('SELECT version FROM schema_migrations');
-  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font', '010_store_cover', '011_store_identity']);
+  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font', '010_store_cover', '011_store_identity', '012_store_contact']);
   const [indexes] = await db.sequelize.query("SHOW INDEX FROM orders WHERE Column_name = 'checkout_key'");
   assert.ok(indexes.some(index => index.Non_unique === 0));
 });
@@ -461,4 +461,16 @@ test('MySQL storefront identity: editable copy and layout persist only for the o
  assert.equal((await pub.getCatalog(b.commerce.slug)).commerce.heroTitle,null);
  await svc.updateSettings(a.commerce.id,{heroTitle:'',heroButtonText:'',announcementText:'',heroLayout:'split'});
  const reset=await svc.getSettings(a.commerce.id);assert.equal(reset.heroTitle,null);assert.equal(reset.heroButtonText,null);assert.equal(reset.announcementText,null);assert.equal(reset.heroLayout,'split');
+});
+
+test('MySQL social settings persist, clear and remain scoped to the owning commerce',async()=>{
+ const {AdminCommerceSettingsService}=require('../dist/catalog/admin-commerce-settings.service');
+ const {PublicCatalogService}=require('../dist/catalog/public-catalog.service');
+ const a=await fixture(),b=await fixture(),svc=new AdminCommerceSettingsService(),pub=new PublicCatalogService();
+ await svc.updateSettings(a.commerce.id,{accountDisplay:'text',instagramUrl:'https://instagram.com/example',facebookUrl:'https://facebook.com/example',tiktokUrl:'https://tiktok.com/@example',youtubeUrl:'https://youtube.com/@example',whatsapp:'5491112345678'});
+ const saved=await svc.getSettings(a.commerce.id),publicA=(await pub.getCatalog(a.commerce.slug)).commerce,publicB=(await pub.getCatalog(b.commerce.slug)).commerce;
+ for(const key of ['accountDisplay','instagramUrl','facebookUrl','tiktokUrl','youtubeUrl','whatsapp'])assert.equal(saved[key],publicA[key]);
+ assert.equal(publicB.accountDisplay,'icon');assert.equal(publicB.instagramUrl,null);assert.equal(publicB.whatsapp,null);
+ await svc.updateSettings(a.commerce.id,{instagramUrl:'',whatsapp:null,accountDisplay:'icon'});
+ const cleared=(await pub.getCatalog(a.commerce.slug)).commerce;assert.equal(cleared.instagramUrl,null);assert.equal(cleared.whatsapp,null);assert.equal(cleared.accountDisplay,'icon');assert.equal(cleared.facebookUrl,saved.facebookUrl);
 });
