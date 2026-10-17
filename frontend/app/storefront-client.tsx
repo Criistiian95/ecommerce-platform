@@ -5,7 +5,7 @@ import CartIcon from './cart-icon';
 import { onColor } from './store-colors';
 import { storeCover } from './store-covers';
 import { storeFont } from './store-fonts';
-import {CSSProperties,useEffect,useState} from 'react';
+import {CSSProperties,useEffect,useRef,useState} from 'react';
 import Link from './store-link';
 import {useCart} from './cart-context';
 import {useCustomerAuth} from './customer-auth-context';
@@ -61,6 +61,7 @@ export default function StorefrontClient({demoMode=false}:{demoMode?:boolean}){
   const [query,setQuery]=useState('');
   const [category,setCategory]=useState('');
   const [sort,setSort]=useState('featured');
+  const searchInput=useRef<HTMLInputElement>(null);
   const [offers,setOffers]=useState(false);
   const [attempt,setAttempt]=useState(0);
   useEffect(()=>{
@@ -74,6 +75,8 @@ export default function StorefrontClient({demoMode=false}:{demoMode?:boolean}){
   const commerce=catalog?.commerce ? {...catalog.commerce, ...designPreview} : undefined;
   const brandName=commerce?.name ?? '';
   const tagline=commerce?.tagline ?? '';
+  const headerTagline=commerce?.headerTagline ?? tagline;
+  const showName=commerce?.headerDisplay==='logo-name';
   const logoSrc=commerce?.hasUploadedLogo
     ? `${API_URL}/catalog/store/${COMMERCE_SLUG}/logo?v=${encodeURIComponent(commerce.updatedAt || "")}`
     : commerce?.logoUrl ?? '';
@@ -91,8 +94,8 @@ export default function StorefrontClient({demoMode=false}:{demoMode?:boolean}){
   return <div className={`commerce-theme${isCfz?' cfz-storefront':''}`} style={themeStyle}>
     <div className="store-masthead"><div className="store-announcement">{isCfz?<span className="store-announcement-shipping"><TruckIcon/>Envíos a todo el país</span>:demoMode?'DEMO INTERACTIVA · RECORRÉ LA TIENDA COMO CLIENTE':(commerce?.announcementText || `${brandName.toUpperCase()} · TIENDA ONLINE`)}</div>
     <header className="store-header">
-      <Link href="/tienda" aria-label={`Ir al inicio de ${brandName}`} className={`store-identity${isCfz?' cfz-identity':''}`}>{logoSrc?<img className="store-logo" src={logoSrc} alt={brandName}/>:<span className="store-monogram" aria-hidden="true">{brandName.charAt(0).toUpperCase()}</span>}{isCfz?<small className="cfz-tagline">{tagline}</small>:<div><div className="store-brand">{brandName}</div><small>{tagline}</small></div>}</Link>
-      <div className="store-header-actions"><a className="store-nav-link" href="#catalogo">Explorar catálogo</a><AccountMenu display={commerce?.accountDisplay} signedIn={!!user}/><Link className="store-cart-icon" href="/carrito" aria-label={`Carrito: ${totalItems} productos`} title="Ver carrito"><CartIcon/><span className="cart-count" aria-hidden="true">{totalItems}</span></Link></div>
+      <Link href="/tienda" aria-label={`Ir al inicio de ${brandName}`} className="store-identity cfz-identity">{logoSrc?<img className="store-logo" src={logoSrc} alt={brandName}/>:<span className="store-monogram" aria-hidden="true">{brandName.charAt(0).toUpperCase()}</span>}{(showName || headerTagline)&&<div className="store-identity-caption">{showName&&<strong className="store-brand">{brandName}</strong>}{headerTagline&&<small className="cfz-tagline">{headerTagline}</small>}</div>}</Link>
+      <div className="store-header-actions"><a className="store-nav-link store-search-icon" href="#catalogo" aria-label="Buscar productos" title="Buscar productos" onClick={()=>window.setTimeout(()=>searchInput.current?.focus(),0)}><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="10.8" cy="10.8" r="7"/><path d="m16 16 5 5"/></svg></a><AccountMenu display={commerce?.accountDisplay} signedIn={!!user}/><Link className="store-cart-icon" href="/carrito" aria-label={`Carrito: ${totalItems} productos`} title="Ver carrito"><CartIcon/><span className="cart-count" aria-hidden="true">{totalItems}</span></Link></div>
     </header>
     <nav className="store-menu" aria-label="Menú de la tienda"><a href="#catalogo" onClick={()=>setCategory('')}>Todos los productos</a>{catalog.categories.map(c=><a key={c.id} href="#catalogo" aria-current={category===c.id?'true':undefined} onClick={()=>setCategory(c.id)}>{c.name}</a>)}<a href="#contacto-tienda">Contacto</a></nav></div>
     <div className="store-content">
@@ -103,7 +106,7 @@ export default function StorefrontClient({demoMode=false}:{demoMode?:boolean}){
     {isCfz?<div className="store-benefits cfz-benefits" aria-label="Beneficios de comprar en nuestra tienda"><span><CardIcon/>Pagá con tarjeta</span><span><TruckIcon/>Envíos a todo el país</span><span><ShieldIcon/>Compra segura</span></div>:<div className="store-benefits"><span><b>01</b> Elegí tus productos</span><span><b>02</b> Armá tu carrito</span><span><b>03</b> Pagá con Mercado Pago</span></div>}
     <section className="store-section" id="catalogo">
       <div className="store-section-head"><div><span className="eyebrow">EXPLORÁ EL CATÁLOGO</span><h2>Nuestros productos</h2></div><span aria-live="polite">{products.length} {products.length===1?'producto':'productos'}</span></div>
-      <div className="catalog-toolbar"><label className="catalog-search"><span aria-hidden="true">⌕</span><input type="search" aria-label="Buscar productos" placeholder="Buscar por producto o marca…" value={query} onChange={e=>setQuery(e.target.value)}/></label><label className="catalog-sort">Ordenar por<select value={sort} onChange={e=>setSort(e.target.value)}><option value="featured">Destacados</option><option value="low">Menor precio</option><option value="high">Mayor precio</option><option value="name">Nombre: A a Z</option></select></label></div>
+      <div className="catalog-toolbar"><label className="catalog-search"><span aria-hidden="true">⌕</span><input ref={searchInput} type="search" aria-label="Buscar productos" placeholder="Buscar por producto o marca…" value={query} onChange={e=>setQuery(e.target.value)}/></label><label className="catalog-sort">Ordenar por<select value={sort} onChange={e=>setSort(e.target.value)}><option value="featured">Destacados</option><option value="low">Menor precio</option><option value="high">Mayor precio</option><option value="name">Nombre: A a Z</option></select></label></div>
       <div className="category-filters" aria-label="Filtros del catálogo"><button className={!category?'active':''} aria-pressed={!category} onClick={()=>setCategory('')}>Todos</button>{catalog?.categories.map(c=><button key={c.id} className={category===c.id?'active':''} aria-pressed={category===c.id} onClick={()=>setCategory(c.id)}>{c.name}</button>)}<button className={offers?'active offer-filter':'offer-filter'} aria-pressed={offers} onClick={()=>setOffers(!offers)}>Solo ofertas</button></div>
       {error?<div className="store-empty" role="alert"><h3>No pudimos abrir el catálogo</h3><p>{error}</p><button className="btn primary" onClick={()=>setAttempt(n=>n+1)}>Reintentar</button></div>:!catalog?<div className="store-empty" role="status">Estamos preparando el catálogo…</div>:<><div className="product-grid">{products.map(p=><StoreProductCard key={p.id} product={p}/>)}</div>{!products.length&&<div className="store-empty"><h3>{catalog.products.length?'No encontramos coincidencias':'Próximamente, nuevos productos'}</h3><p>{catalog.products.length?'Probá otra búsqueda o cambiá los filtros.':'Volvé a visitarnos para conocer el catálogo.'}</p>{catalog.products.length>0&&<button className="btn secondary" onClick={()=>{setQuery('');setCategory('');setOffers(false);}}>Limpiar filtros</button>}</div>}</>}
     </section>
