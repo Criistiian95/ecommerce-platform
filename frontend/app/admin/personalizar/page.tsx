@@ -7,7 +7,7 @@ import styles from './personalizar.module.css';
 import { API_URL } from '../../storefront-types';
 import { useStorefront } from '../../storefront-context';
 
-type Design={heroTitle:string;heroButtonText:string;announcementText:string;heroLayout:string;backgroundColor:string;coverPreset:string;coverUrl:string;fontFamily:string;name:string;tagline:string;primaryColor:string;secondaryColor:string;logoUrl:string};
+type Design={accountDisplay:string;whatsapp:string;instagramUrl:string;facebookUrl:string;tiktokUrl:string;youtubeUrl:string;heroTitle:string;heroButtonText:string;announcementText:string;heroLayout:string;backgroundColor:string;coverPreset:string;coverUrl:string;fontFamily:string;name:string;tagline:string;primaryColor:string;secondaryColor:string;logoUrl:string};
 type Settings=Design & {slug:string;hasUploadedLogo:boolean;hasUploadedCover:boolean;updatedAt?:string};
 const palettes=[
   ['Roble','#987042','#332b22','#faf5eb'],
@@ -38,7 +38,7 @@ export default function Personalizar(){
   const [message,setMessage]=useState('');const [error,setError]=useState('');
   const dirty=!!design && JSON.stringify(design)!==baseline;
   function accept(data:Settings){
-    const next={heroTitle:data.heroTitle||'',heroButtonText:data.heroButtonText||'',announcementText:data.announcementText||'',heroLayout:data.heroLayout||'split',backgroundColor:data.backgroundColor||'#f7f9fd',coverPreset:data.coverPreset||'none',coverUrl:storeCover(data),fontFamily:data.fontFamily||'modern',name:data.name,tagline:data.tagline||'',primaryColor:data.primaryColor,secondaryColor:data.secondaryColor,logoUrl:data.hasUploadedLogo?`${API_URL}/catalog/store/${encodeURIComponent(data.slug)}/logo?v=${encodeURIComponent(data.updatedAt||'')}`:data.logoUrl||''};
+    const next={accountDisplay:data.accountDisplay||'icon',whatsapp:data.whatsapp||'',instagramUrl:data.instagramUrl||'',facebookUrl:data.facebookUrl||'',tiktokUrl:data.tiktokUrl||'',youtubeUrl:data.youtubeUrl||'',heroTitle:data.heroTitle||'',heroButtonText:data.heroButtonText||'',announcementText:data.announcementText||'',heroLayout:data.heroLayout||'split',backgroundColor:data.backgroundColor||'#f7f9fd',coverPreset:data.coverPreset||'none',coverUrl:storeCover(data),fontFamily:data.fontFamily||'modern',name:data.name,tagline:data.tagline||'',primaryColor:data.primaryColor,secondaryColor:data.secondaryColor,logoUrl:data.hasUploadedLogo?`${API_URL}/catalog/store/${encodeURIComponent(data.slug)}/logo?v=${encodeURIComponent(data.updatedAt||'')}`:data.logoUrl||''};
     setLogoOriginal('');setSettings(data);setDesign(next);setBaseline(JSON.stringify(next));
   }
   async function load(auth:string){
@@ -92,6 +92,14 @@ export default function Personalizar(){
     {!design?<div><p>Cargando tu tienda…</p>{error&&<button onClick={()=>load(token)}>Reintentar</button>}</div>:<div className={styles.workspace}>
       <form onSubmit={save} className={styles.editor}><fieldset disabled={saving||reading}>
         <h2>Identidad del comercio</h2><label>Nombre comercial<input required maxLength={120} value={design.name} onChange={e=>change('name',e.target.value)}/></label>
+        <h2>Cuenta de clientes</h2>
+        <label>Mostrar acceso a la cuenta<select value={design.accountDisplay} onChange={e=>change('accountDisplay',e.target.value)}><option value="icon">Ícono de persona</option><option value="text">Palabra «Cuenta»</option></select></label>
+        <small>Al pasar el mouse o tocarlo, se abre el menú para ingresar o crear una cuenta.</small>
+        <h2>Redes sociales y WhatsApp</h2>
+        <p className={styles.note}>Solo se muestran los canales que completes. Borrá un campo para ocultarlo.</p>
+        <label>WhatsApp / WhatsApp Business<input type="tel" maxLength={60} placeholder="5491112345678" value={design.whatsapp} onChange={e=>change('whatsapp',e.target.value)}/></label>
+        <small>Ingresá el número con código de país. Para un celular argentino: 549 + código de área + número, sin el 15. Abre el chat del número indicado, también si usa Business.</small>
+        {([['instagramUrl','Instagram','https://www.instagram.com/tucomercio'],['facebookUrl','Facebook','https://www.facebook.com/tucomercio'],['tiktokUrl','TikTok','https://www.tiktok.com/@tucomercio'],['youtubeUrl','YouTube','https://www.youtube.com/@tucomercio']] as const).map(([key,label,placeholder])=><label key={key}>{label}<input type="url" maxLength={500} placeholder={placeholder} value={design[key]} onChange={e=>change(key,e.target.value)}/></label>)}
         <h2>Textos de tu tienda</h2>
         <label>Título principal de portada<textarea rows={3} maxLength={180} placeholder={`Todo lo que buscás,\nen ${design.name}.`} value={design.heroTitle} onChange={e=>change('heroTitle',e.target.value)}/></label>
         <small>Podés escribir el título completo y usar saltos de línea. Vacío usa el título automático.</small>

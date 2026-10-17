@@ -36,3 +36,12 @@ test('storefront text rejects overlong values, nontext values and unknown layout
  mock.method(Commerce,'findByPk',async()=>commerce());const svc=new AdminCommerceSettingsService();
  for(const input of [{heroTitle:'a'.repeat(181)},{heroTitle:42},{heroButtonText:'a'.repeat(41)},{announcementText:'a'.repeat(161)},{heroLayout:'unsafe'}]) await assert.rejects(()=>svc.updateSettings('a',input));
 });
+
+test('account and social settings validate destinations, preserve omitted values and allow removing links',async()=>{
+ const c=commerce();mock.method(Commerce,'findByPk',async id=>{assert.equal(id,'a');return c});const svc=new AdminCommerceSettingsService();
+ const saved=await svc.updateSettings('a',{accountDisplay:'text',instagramUrl:'https://www.instagram.com/shop/',whatsapp:'+54 9 11 1234-5678'});
+ assert.equal(saved.accountDisplay,'text');assert.equal(saved.instagramUrl,'https://www.instagram.com/shop/');
+ assert.equal((await svc.updateSettings('a',{heroTitle:'Shop'})).instagramUrl,saved.instagramUrl);
+ assert.equal((await svc.updateSettings('a',{instagramUrl:''})).instagramUrl,null);
+ for(const input of [{accountDisplay:'bad'},{instagramUrl:'javascript:alert(1)'},{instagramUrl:'https://instagram.com.evil.test/'},{facebookUrl:'https://instagram.com/'},{tiktokUrl:'https://user:pass@tiktok.com/'},{youtubeUrl:42},{whatsapp:'hello'},{whatsapp:'123'}])await assert.rejects(()=>svc.updateSettings('a',input));
+});
