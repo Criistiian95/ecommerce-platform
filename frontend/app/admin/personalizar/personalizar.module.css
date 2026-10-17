@@ -5,3 +5,13 @@
 .colors{flex-wrap:wrap}.covers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:16px 0}.covers button{padding:4px;overflow:hidden;border:2px solid transparent;background:#f3f4f6;border-radius:10px;cursor:pointer}.covers button[aria-pressed=true]{border-color:#245ce6;background:#eaf0ff}.covers img{display:block;width:100%;aspect-ratio:1.2;object-fit:cover;border-radius:6px}.covers span{display:block;font-size:12px;padding:8px 0}.coverPreview{width:100%;aspect-ratio:1.5;object-fit:cover;border-radius:10px;margin-top:12px}.palettes button{gap:5px}.palettes i{border:1px solid #0002}.editor h2:not(:first-child){margin-top:28px}
 
 .logo img{background-color:#fff;background-image:conic-gradient(#e2e4e8 25%,transparent 0 50%,#e2e4e8 0 75%,transparent 0);background-size:16px 16px}.logoTools{padding:12px;border:1px solid #dfe5ef;border-radius:10px;font-size:13px;margin:14px 0}.logoTools summary{cursor:pointer;font-weight:600}.logoTools p{line-height:1.5}.logoTools .check{display:flex;align-items:center;gap:8px}.logoTools .check input{width:auto}.logoTools button{margin:6px 4px 0 0}
+
+/* Portadas por rubro: filtros rápidos y miniaturas uniformes. */
+.coverGroups{display:flex;flex-wrap:wrap;gap:6px;margin:16px 0 8px}
+.coverGroups button{border-radius:18px;padding:7px 10px;font-size:11px}
+.coverGroups button[aria-pressed=true]{background:#235f47;color:white;border-color:#235f47}
+.covers{grid-template-columns:repeat(2,minmax(0,1fr))}
+.covers button{min-width:0;display:flex;flex-direction:column;gap:4px;align-items:stretch;border-color:#e0e6e1}
+.covers button[aria-pressed=true]{border-color:#235f47;background:#e9f4ec}
+.covers img{width:100%;aspect-ratio:16/9;object-fit:cover;background:#eceae6}
+.covers span{line-height:1.25;min-height:31px}

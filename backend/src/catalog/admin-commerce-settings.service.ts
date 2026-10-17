@@ -154,7 +154,7 @@ export class AdminCommerceSettingsService {
     if(input.heroLayout!==undefined && !['split','banner'].includes(input.heroLayout)) throw new BadRequestException('Diseño de portada inválido');
     if(input.fontFamily!==undefined && !['modern','classic','friendly','mono'].includes(input.fontFamily)) throw new BadRequestException('Tipografía inválida');
     this.validateColor(input.backgroundColor, 'El color de fondo');
-    if (input.coverPreset !== undefined && !['none','oak','workshop','home','custom'].includes(input.coverPreset)) throw new BadRequestException('Portada inválida');
+    if (input.coverPreset !== undefined && !['none','oak','workshop','home','fashion','shoes','sports','phones','computing','appliances','beauty','pets','organize','hardware','toys','grocery','custom'].includes(input.coverPreset)) throw new BadRequestException('Portada inválida');
     const cover = this.decodeCover(input);
     if (cover && input.coverPreset !== 'custom') throw new BadRequestException('Elegí la portada personalizada para subir una imagen');
     if (input.coverPreset === 'custom' && !cover && !commerce.coverData) throw new BadRequestException('Subí una imagen para la portada');
