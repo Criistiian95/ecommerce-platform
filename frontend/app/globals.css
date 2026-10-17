@@ -137,3 +137,10 @@ button,input,textarea,select{font:inherit}button,a,input,textarea,select{-webkit
 @media(max-width:760px){.storefront-page .store-content{padding:0 20px}.store-shell.storefront-page .store-header{padding:16px 20px;gap:12px}.storefront-page .store-logo{height:62px;max-width:85px}.storefront-page .store-brand{font-size:17px}.storefront-page .store-identity small{display:none}.storefront-page .store-header-actions{gap:8px}.storefront-page .store-menu{gap:22px;padding:0 20px 12px}.store-shell.storefront-page .store-hero{padding:32px 0}.store-shell.storefront-page .store-hero h1{font-size:clamp(32px,9vw,44px)}.store-shell.storefront-page .hero-banner.with-cover{min-height:440px;padding:40px 20px}.storefront-page .hero-banner:after{background:#0009}}
 
 .store-shell.storefront-page{overflow-x:clip}
+
+/* Clear catalog cards on each merchant's full-page background. */
+.store-shell .commerce-theme .store-product-card{border:2px solid color-mix(in srgb,var(--accent) 65%,white);box-shadow:0 5px 16px #00000008;background:#fff}
+.store-shell .commerce-theme .store-product-card:hover{border-color:var(--accent);box-shadow:0 10px 24px #00000012}
+.store-shell .commerce-theme .store-product-image-wrap{aspect-ratio:4/3;background:#fffdf9;border-bottom:1px solid color-mix(in srgb,var(--accent) 25%,white)}
+.store-shell .commerce-theme .store-product-image{object-fit:contain;padding:12px}
+.store-shell .commerce-theme .store-product-content p{line-height:1.55;white-space:pre-line}
