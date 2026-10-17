@@ -13,8 +13,21 @@ import StoreProductCard from './store-product-card';
 import {API_URL,StoreCatalog} from './storefront-types';
 import { useStorefront } from './storefront-context';
 
+function TruckIcon({className}:{className?:string}){
+  return <svg className={className} viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 5h11v12H3zM14 9h4l3 4v4h-7z"/><circle cx="7.5" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/></svg>;
+}
+
+function CardIcon(){
+  return <svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h5"/></svg>;
+}
+
+function ShieldIcon(){
+  return <svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 2 4 5v6c0 5.3 3.4 9 8 11 4.6-2 8-5.7 8-11V5z"/><path d="m8.7 12 2.3 2.4 4.6-4.8"/></svg>;
+}
+
 export default function StorefrontClient({demoMode=false}:{demoMode?:boolean}){
   const { slug: COMMERCE_SLUG } = useStorefront();
+  const isCfz=COMMERCE_SLUG==='cfz-carpinteria';
   const {totalItems}=useCart();
   const {user}=useCustomerAuth();
   const [catalog,setCatalog]=useState<StoreCatalog|null>(null);
@@ -68,17 +81,17 @@ export default function StorefrontClient({demoMode=false}:{demoMode?:boolean}){
   const whatsappLink=whatsappHref(commerce?.whatsapp);
   const themeStyle={
     '--store-font':storeFont(commerce?.fontFamily),
-    '--store-background':commerce?.backgroundColor || '#f7f9fd',
+    '--store-background':isCfz && (!commerce?.backgroundColor || commerce.backgroundColor==='#f7f9fd') ? '#faf5ed' : commerce?.backgroundColor || '#f7f9fd',
     '--on-accent':onColor(commerce?.primaryColor || '#245ce6'),
     '--accent':commerce?.primaryColor || '#245ce6',
     '--ink':commerce?.secondaryColor || '#172238',
   } as CSSProperties;
   const products=(catalog?.products??[]).filter(p=>(!category||p.category?.id===category)&&(!offers||(p.offerPrice!==null&&p.offerPrice!==undefined&&Number(p.offerPrice)<Number(p.price)))&&normalize(`${p.name} ${p.brand??''} ${p.category?.name??''}`).includes(normalize(query.trim()))).sort((a,b)=>sort==='low'?Number(a.offerPrice??a.price)-Number(b.offerPrice??b.price):sort==='high'?Number(b.offerPrice??b.price)-Number(a.offerPrice??a.price):sort==='name'?a.name.localeCompare(b.name,'es'):Number(b.featured)-Number(a.featured));
   if(!catalog || catalog.commerce.slug!==COMMERCE_SLUG) return <div className="store-loading" role={error?'alert':'status'} aria-busy={!error}>{error?<><p>{error}</p><button className="btn primary" onClick={()=>setAttempt(n=>n+1)}>Reintentar</button></>:<><span className="loading-shape" aria-hidden="true"/><p>Cargando tienda…</p></>}</div>;
-  return <div className="commerce-theme" style={themeStyle}>
-    <div className="store-masthead"><div className="store-announcement">{demoMode?'DEMO INTERACTIVA · RECORRÉ LA TIENDA COMO CLIENTE':(commerce?.announcementText || `${brandName.toUpperCase()} · TIENDA ONLINE`)}</div>
+  return <div className={`commerce-theme${isCfz?' cfz-storefront':''}`} style={themeStyle}>
+    <div className="store-masthead"><div className="store-announcement">{isCfz?<span className="store-announcement-shipping"><TruckIcon/>Envíos a todo el país</span>:demoMode?'DEMO INTERACTIVA · RECORRÉ LA TIENDA COMO CLIENTE':(commerce?.announcementText || `${brandName.toUpperCase()} · TIENDA ONLINE`)}</div>
     <header className="store-header">
-      <Link href="/tienda" className="store-identity">{logoSrc?<img className="store-logo" src={logoSrc} alt={brandName}/>:<span className="store-monogram" aria-hidden="true">{brandName.charAt(0).toUpperCase()}</span>}<div><div className="store-brand">{brandName}</div><small>{tagline}</small></div></Link>
+      <Link href="/tienda" aria-label={`Ir al inicio de ${brandName}`} className={`store-identity${isCfz?' cfz-identity':''}`}>{logoSrc?<img className="store-logo" src={logoSrc} alt={brandName}/>:<span className="store-monogram" aria-hidden="true">{brandName.charAt(0).toUpperCase()}</span>}{isCfz?<small className="cfz-tagline">{tagline}</small>:<div><div className="store-brand">{brandName}</div><small>{tagline}</small></div>}</Link>
       <div className="store-header-actions"><a className="store-nav-link" href="#catalogo">Explorar catálogo</a><AccountMenu display={commerce?.accountDisplay} signedIn={!!user}/><Link className="store-cart-icon" href="/carrito" aria-label={`Carrito: ${totalItems} productos`} title="Ver carrito"><CartIcon/><span className="cart-count" aria-hidden="true">{totalItems}</span></Link></div>
     </header>
     <nav className="store-menu" aria-label="Menú de la tienda"><a href="#catalogo" onClick={()=>setCategory('')}>Todos los productos</a>{catalog.categories.map(c=><a key={c.id} href="#catalogo" aria-current={category===c.id?'true':undefined} onClick={()=>setCategory(c.id)}>{c.name}</a>)}<a href="#contacto-tienda">Contacto</a></nav></div>
@@ -87,7 +100,7 @@ export default function StorefrontClient({demoMode=false}:{demoMode?:boolean}){
       <div className="hero-copy"><span className="eyebrow">COMPRA ONLINE</span><h1>{commerce?.heroTitle || <>Todo lo que buscás,<br/><em>en {brandName}.</em></>}</h1><p>{commerce?.tagline || 'Explorá nuestro catálogo, elegí tus productos y comprá de forma simple y segura.'}</p><a className="btn primary" href="#catalogo">{commerce?.heroButtonText || 'Ver productos'} <span aria-hidden="true">↗</span></a></div>
       {coverSrc&&<div className="hero-cover"><img src={coverSrc} alt=""/></div>}
     </section>
-    <div className="store-benefits"><span><b>01</b> Elegí tus productos</span><span><b>02</b> Armá tu carrito</span><span><b>03</b> Pagá con Mercado Pago</span></div>
+    {isCfz?<div className="store-benefits cfz-benefits" aria-label="Beneficios de comprar en nuestra tienda"><span><CardIcon/>Pagá con tarjeta</span><span><TruckIcon/>Envíos a todo el país</span><span><ShieldIcon/>Compra segura</span></div>:<div className="store-benefits"><span><b>01</b> Elegí tus productos</span><span><b>02</b> Armá tu carrito</span><span><b>03</b> Pagá con Mercado Pago</span></div>}
     <section className="store-section" id="catalogo">
       <div className="store-section-head"><div><span className="eyebrow">EXPLORÁ EL CATÁLOGO</span><h2>Nuestros productos</h2></div><span aria-live="polite">{products.length} {products.length===1?'producto':'productos'}</span></div>
       <div className="catalog-toolbar"><label className="catalog-search"><span aria-hidden="true">⌕</span><input type="search" aria-label="Buscar productos" placeholder="Buscar por producto o marca…" value={query} onChange={e=>setQuery(e.target.value)}/></label><label className="catalog-sort">Ordenar por<select value={sort} onChange={e=>setSort(e.target.value)}><option value="featured">Destacados</option><option value="low">Menor precio</option><option value="high">Mayor precio</option><option value="name">Nombre: A a Z</option></select></label></div>

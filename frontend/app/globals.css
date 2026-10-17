@@ -161,3 +161,21 @@ button,input,textarea,select{font:inherit}button,a,input,textarea,select{-webkit
 @media(max-width:600px){.store-header-actions{gap:8px}.store-whatsapp-button{right:12px;padding:12px 16px}}
 
 .store-account-trigger:focus-visible{outline-color:currentColor}
+
+/* CFZ Carpintería: cálida y editorial, sin afectar otros comercios. */
+.storefront-page .cfz-storefront{--cfz-brown:#8a5c39;--cfz-cream:#faf5ed}
+.storefront-page .cfz-storefront .store-masthead{background:var(--cfz-cream);color:var(--ink)}
+.storefront-page .cfz-storefront .store-announcement{background:var(--cfz-brown);color:#fff;border:0;min-height:38px;display:flex;align-items:center;justify-content:center;padding:7px 18px;font-size:13px;font-weight:650;letter-spacing:0}
+.cfz-storefront .store-announcement-shipping{display:inline-flex;align-items:center;justify-content:center;gap:11px}
+.cfz-storefront .store-announcement-shipping svg{flex:none}
+.storefront-page .cfz-storefront .store-header,.storefront-page .cfz-storefront .store-menu{color:var(--ink)}
+.storefront-page .cfz-storefront .cfz-identity{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:130px;text-align:center}
+.storefront-page .cfz-storefront .cfz-identity .store-logo{max-width:150px;height:75px}
+.storefront-page .cfz-storefront .cfz-identity .cfz-tagline{display:block;max-width:220px;color:var(--ink);opacity:1;font-size:12px;line-height:1.35;white-space:normal}
+.storefront-page .cfz-storefront .store-account-dropdown{background:var(--cfz-brown);color:#fff;border:1px solid color-mix(in srgb,var(--cfz-brown) 85%,#fff)}
+.storefront-page .cfz-storefront .store-account-dropdown a:hover,.storefront-page .cfz-storefront .store-account-dropdown a:focus-visible{background:#ffffff21;color:#fff}
+.storefront-page .cfz-storefront .cfz-benefits{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;padding:19px 0;border-bottom:1px solid color-mix(in srgb,var(--cfz-brown) 28%,transparent);color:var(--ink);font-size:13px}
+.storefront-page .cfz-storefront .cfz-benefits span{display:flex;align-items:center;justify-content:center;gap:12px;min-height:30px;padding:0 12px;text-align:center}
+.storefront-page .cfz-storefront .cfz-benefits span+span{border-left:1px solid color-mix(in srgb,var(--cfz-brown) 25%,transparent)}
+.storefront-page .cfz-storefront .cfz-benefits svg{flex:none;width:23px;height:23px}
+@media(max-width:760px){.storefront-page .cfz-storefront .cfz-identity{min-width:0;align-items:flex-start;text-align:left}.storefront-page .cfz-storefront .cfz-identity .store-logo{max-width:100px;height:58px}.storefront-page .cfz-storefront .cfz-identity .cfz-tagline{display:block;font-size:10px;max-width:150px}.storefront-page .cfz-storefront .cfz-benefits{grid-template-columns:1fr;gap:10px;padding:15px 0}.storefront-page .cfz-storefront .cfz-benefits span{justify-content:flex-start;text-align:left;padding:0 4px;gap:9px;min-height:26px}.storefront-page .cfz-storefront .cfz-benefits span+span{border-left:0}}
