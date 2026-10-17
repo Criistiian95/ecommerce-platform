@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { transparentLogo } from '../../logo-background';
-import { storeCovers, storeCover } from '../../store-covers';
+import { coverGroups, storeCovers, storeCover, type CoverGroup } from '../../store-covers';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import styles from './personalizar.module.css';
 import { API_URL } from '../../storefront-types';
@@ -34,6 +34,7 @@ export default function Personalizar(){
   const [baseline,setBaseline]=useState('');
   const [ready,setReady]=useState(0);const [mobile,setMobile]=useState(false);
   const [saving,setSaving]=useState(false);const [reading,setReading]=useState(false);
+  const [coverGroup,setCoverGroup]=useState<CoverGroup>('Todas');
   const [logoOriginal,setLogoOriginal]=useState('');const [logoTolerance,setLogoTolerance]=useState(32);const [logoInside,setLogoInside]=useState(false);
   const [message,setMessage]=useState('');const [error,setError]=useState('');
   const dirty=!!design && JSON.stringify(design)!==baseline;
@@ -116,7 +117,7 @@ export default function Personalizar(){
         <label>Subir mi portada<input ref={coverInput} type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>void upload(e.target.files?.[0],'cover')}/></label>
         <small>JPG, PNG o WebP · Hasta 2 MB · Recomendamos una foto horizontal. Se adapta al tamaño de pantalla.</small>
         {design.coverPreset==='custom'&&<img className={styles.coverPreview} src={design.coverUrl} alt="Tu portada seleccionada"/>}
-        <div className={styles.covers}>{storeCovers.map(cover=><button type="button" key={cover.id} aria-pressed={design.coverPreset===cover.id} onClick={()=>{setDesign({...design,coverPreset:cover.id,coverUrl:cover.src});setMessage('');if(coverInput.current)coverInput.current.value='';}}><img src={cover.src} alt=""/><span>{cover.name}</span></button>)}</div>
+        <div className={styles.coverGroups} aria-label="Filtrar portadas por rubro">{coverGroups.map(group=><button key={group} type="button" aria-pressed={coverGroup===group} onClick={()=>setCoverGroup(group)}>{group}</button>)}</div><div className={styles.covers}>{storeCovers.filter(cover=>coverGroup==='Todas'||cover.group===coverGroup).map(cover=><button type="button" key={cover.id} aria-pressed={design.coverPreset===cover.id} onClick={()=>{setDesign({...design,coverPreset:cover.id,coverUrl:cover.src});setMessage('');if(coverInput.current)coverInput.current.value='';}}><img loading="lazy" src={cover.thumbnail} alt={cover.name}/><span>{cover.name}</span></button>)}</div><small>Las portadas prediseñadas son fotografías de muestra. El texto y los colores de tu tienda siguen siendo editables.</small>
         <small>Imágenes decorativas de ejemplo generadas con IA. No representan trabajos del comercio.</small>
         <button type="button" aria-pressed={design.coverPreset==='none'} onClick={()=>{setDesign({...design,coverPreset:'none',coverUrl:''});setMessage('');if(coverInput.current)coverInput.current.value='';}}>Sin imagen · Portada simple</button>
         <h2>Colores y tipografía</h2>
