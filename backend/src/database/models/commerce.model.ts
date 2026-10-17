@@ -14,6 +14,8 @@ export class Commerce extends Model {
   declare announcementText: string | null;
   declare heroLayout: string;
   declare tagline: string | null;
+  declare headerTagline: string | null;
+  declare headerDisplay: string;
   declare fontFamily: string;
   declare backgroundColor: string;
   declare coverPreset: string;
@@ -64,6 +66,8 @@ export class Commerce extends Model {
           type: DataTypes.STRING(180),
           allowNull: true,
         },
+        headerTagline: { type: DataTypes.STRING(180), allowNull: true, field: 'header_tagline' },
+        headerDisplay: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'logo', field: 'header_display' },
         fontFamily: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'modern', field: 'font_family' },
         backgroundColor: { type: DataTypes.STRING(20), allowNull: false, defaultValue: '#f7f9fd', field: 'background_color' },
         coverPreset: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'none', field: 'cover_preset' },

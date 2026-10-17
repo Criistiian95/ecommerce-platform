@@ -179,3 +179,26 @@ button,input,textarea,select{font:inherit}button,a,input,textarea,select{-webkit
 .storefront-page .cfz-storefront .cfz-benefits span+span{border-left:1px solid color-mix(in srgb,var(--cfz-brown) 25%,transparent)}
 .storefront-page .cfz-storefront .cfz-benefits svg{flex:none;width:23px;height:23px}
 @media(max-width:760px){.storefront-page .cfz-storefront .cfz-identity{min-width:0;align-items:flex-start;text-align:left}.storefront-page .cfz-storefront .cfz-identity .store-logo{max-width:100px;height:58px}.storefront-page .cfz-storefront .cfz-identity .cfz-tagline{display:block;font-size:10px;max-width:150px}.storefront-page .cfz-storefront .cfz-benefits{grid-template-columns:1fr;gap:10px;padding:15px 0}.storefront-page .cfz-storefront .cfz-benefits span{justify-content:flex-start;text-align:left;padding:0 4px;gap:9px;min-height:26px}.storefront-page .cfz-storefront .cfz-benefits span+span{border-left:0}}
+
+/* Compact, universal storefront header. Per-merchant colors remain configurable. */
+.storefront-page .store-masthead{display:grid;grid-template-columns:minmax(130px,1fr) minmax(0,2fr) minmax(140px,1fr);align-items:center;column-gap:16px;background:var(--store-background,#f7f9fd);color:var(--ink)}
+.storefront-page .store-announcement{grid-column:1/-1}
+.store-shell.storefront-page .store-header{display:contents}
+.storefront-page .store-identity{grid-column:1;grid-row:2;margin:6px 0 6px max(20px,calc((100vw - 1176px)/2));min-width:0}
+.storefront-page .store-header-actions{grid-column:3;grid-row:2;justify-self:end;margin-right:max(20px,calc((100vw - 1176px)/2));gap:8px}
+.storefront-page .store-menu{grid-column:2;grid-row:2;display:flex;align-items:center;justify-content:center;overflow-x:auto;max-width:none;width:100%;padding:8px 4px;gap:clamp(10px,1.6vw,26px);scrollbar-width:thin}
+.storefront-page .cfz-identity{display:flex;flex-direction:column;gap:2px;align-items:center;text-align:center;justify-content:center}
+.storefront-page .cfz-identity .store-logo{height:45px;max-width:105px}
+.storefront-page .store-identity-caption{display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1.15}
+.storefront-page .cfz-identity .cfz-tagline{display:block;opacity:.95;color:inherit;max-width:160px;font-size:10px;line-height:1.2}
+.storefront-page .cfz-identity .store-brand{font-size:12px;line-height:1.2}
+.storefront-page .store-search-icon{display:flex;align-items:center;justify-content:center;width:39px;height:39px}
+.storefront-page .store-search-icon:focus-visible{outline:2px solid currentColor;outline-offset:2px;border-radius:8px}
+@media(max-width:760px){.storefront-page .store-masthead{grid-template-columns:minmax(0,1fr) auto;gap:0 8px}.storefront-page .store-identity{grid-column:1;grid-row:2;margin:4px 0 4px 16px}.storefront-page .cfz-identity{align-items:flex-start;text-align:left}.storefront-page .store-identity-caption{align-items:flex-start}.storefront-page .cfz-identity .store-logo{max-width:85px;height:41px}.storefront-page .store-header-actions{grid-column:2;grid-row:2;margin-right:12px;gap:2px}.storefront-page .store-menu{grid-column:1/-1;grid-row:3;justify-content:flex-start;padding:4px 16px 9px;gap:18px}.storefront-page .store-search-icon{display:flex;width:39px}.storefront-page .cfz-identity .cfz-tagline{max-width:145px;font-size:10px}}
+
+/* The compact header also overrides the previous CFZ-only sizing. */
+.storefront-page .cfz-storefront .cfz-identity{grid-column:1;grid-row:2;min-width:0;margin:6px 0 6px max(20px,calc((100vw - 1176px)/2));align-items:center;text-align:center;gap:2px}
+.storefront-page .cfz-storefront .cfz-identity .store-logo{height:45px;max-width:105px}
+.storefront-page .cfz-storefront .cfz-identity .cfz-tagline{display:block;max-width:160px;font-size:10px;line-height:1.2}
+.storefront-page .cfz-storefront .store-account-dropdown{top:100%}
+@media(max-width:760px){.storefront-page .cfz-storefront .cfz-identity{margin:4px 0 4px 16px;align-items:flex-start;text-align:left}.storefront-page .cfz-storefront .cfz-identity .store-logo{height:41px;max-width:85px}.storefront-page .cfz-storefront .cfz-identity .cfz-tagline{display:block;font-size:10px;max-width:145px}}

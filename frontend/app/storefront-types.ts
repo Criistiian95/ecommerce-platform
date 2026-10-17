@@ -24,6 +24,8 @@ export type StoreCatalog = {
     name: string;
     slug: string;
     tagline?: string | null;
+    headerTagline?: string | null;
+    headerDisplay?: string;
     fontFamily?: string;
     accountDisplay?: string;
     instagramUrl?: string | null;

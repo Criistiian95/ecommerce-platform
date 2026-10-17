@@ -7,7 +7,7 @@ import styles from './personalizar.module.css';
 import { API_URL } from '../../storefront-types';
 import { useStorefront } from '../../storefront-context';
 
-type Design={accountDisplay:string;whatsapp:string;instagramUrl:string;facebookUrl:string;tiktokUrl:string;youtubeUrl:string;heroTitle:string;heroButtonText:string;announcementText:string;heroLayout:string;backgroundColor:string;coverPreset:string;coverUrl:string;fontFamily:string;name:string;tagline:string;primaryColor:string;secondaryColor:string;logoUrl:string};
+type Design={accountDisplay:string;whatsapp:string;instagramUrl:string;facebookUrl:string;tiktokUrl:string;youtubeUrl:string;heroTitle:string;heroButtonText:string;announcementText:string;heroLayout:string;backgroundColor:string;coverPreset:string;coverUrl:string;fontFamily:string;name:string;tagline:string;headerTagline:string;headerDisplay:string;primaryColor:string;secondaryColor:string;logoUrl:string};
 type Settings=Design & {slug:string;hasUploadedLogo:boolean;hasUploadedCover:boolean;updatedAt?:string};
 const palettes=[
   ['Roble','#987042','#332b22','#faf5eb'],
@@ -38,7 +38,7 @@ export default function Personalizar(){
   const [message,setMessage]=useState('');const [error,setError]=useState('');
   const dirty=!!design && JSON.stringify(design)!==baseline;
   function accept(data:Settings){
-    const next={accountDisplay:data.accountDisplay||'icon',whatsapp:data.whatsapp||'',instagramUrl:data.instagramUrl||'',facebookUrl:data.facebookUrl||'',tiktokUrl:data.tiktokUrl||'',youtubeUrl:data.youtubeUrl||'',heroTitle:data.heroTitle||'',heroButtonText:data.heroButtonText||'',announcementText:data.announcementText||'',heroLayout:data.heroLayout||'split',backgroundColor:data.backgroundColor||'#f7f9fd',coverPreset:data.coverPreset||'none',coverUrl:storeCover(data),fontFamily:data.fontFamily||'modern',name:data.name,tagline:data.tagline||'',primaryColor:data.primaryColor,secondaryColor:data.secondaryColor,logoUrl:data.hasUploadedLogo?`${API_URL}/catalog/store/${encodeURIComponent(data.slug)}/logo?v=${encodeURIComponent(data.updatedAt||'')}`:data.logoUrl||''};
+    const next={accountDisplay:data.accountDisplay||'icon',whatsapp:data.whatsapp||'',instagramUrl:data.instagramUrl||'',facebookUrl:data.facebookUrl||'',tiktokUrl:data.tiktokUrl||'',youtubeUrl:data.youtubeUrl||'',heroTitle:data.heroTitle||'',heroButtonText:data.heroButtonText||'',announcementText:data.announcementText||'',heroLayout:data.heroLayout||'split',backgroundColor:data.backgroundColor||'#f7f9fd',coverPreset:data.coverPreset||'none',coverUrl:storeCover(data),fontFamily:data.fontFamily||'modern',name:data.name,tagline:data.tagline||'',headerTagline:data.headerTagline??data.tagline??'',headerDisplay:data.headerDisplay||'logo',primaryColor:data.primaryColor,secondaryColor:data.secondaryColor,logoUrl:data.hasUploadedLogo?`${API_URL}/catalog/store/${encodeURIComponent(data.slug)}/logo?v=${encodeURIComponent(data.updatedAt||'')}`:data.logoUrl||''};
     setLogoOriginal('');setSettings(data);setDesign(next);setBaseline(JSON.stringify(next));
   }
   async function load(auth:string){
@@ -92,7 +92,7 @@ export default function Personalizar(){
     {!design?<div><p>Cargando tu tienda…</p>{error&&<button onClick={()=>load(token)}>Reintentar</button>}</div>:<div className={styles.workspace}>
       <form onSubmit={save} className={styles.editor}><fieldset disabled={saving||reading}>
         <h2>Identidad del comercio</h2><label>Nombre comercial<input required maxLength={120} value={design.name} onChange={e=>change('name',e.target.value)}/></label>
-        <h2>Cuenta de clientes</h2>
+        <label>Frase debajo del logo<input maxLength={180} value={design.headerTagline} placeholder="Tu idea, hecha en madera" onChange={e=>change('headerTagline',e.target.value)}/></label><small>Es independiente de la descripción de portada y se muestra bajo el logo.</small><label>Identidad del encabezado<select value={design.headerDisplay} onChange={e=>change('headerDisplay',e.target.value)}><option value="logo">Solo logo y frase</option><option value="logo-name">Logo, nombre y frase</option></select></label><h2>Cuenta de clientes</h2>
         <label>Mostrar acceso a la cuenta<select value={design.accountDisplay} onChange={e=>change('accountDisplay',e.target.value)}><option value="icon">Ícono de persona</option><option value="text">Palabra «Cuenta»</option></select></label>
         <small>Al pasar el mouse o tocarlo, se abre el menú para ingresar o crear una cuenta.</small>
         <h2>Redes sociales y WhatsApp</h2>

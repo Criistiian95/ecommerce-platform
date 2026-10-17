@@ -17,6 +17,8 @@ export type CommerceSettingsInput = {
   coverMimeType?: string;
   name?: string;
   tagline?: string | null;
+  headerTagline?: string | null;
+  headerDisplay?: string;
   fontFamily?: string;
   primaryColor?: string;
   secondaryColor?: string;
@@ -92,6 +94,8 @@ export class AdminCommerceSettingsService {
       name: plain.name,
       slug: plain.slug,
       tagline: plain.tagline,
+      headerTagline: plain.headerTagline,
+      headerDisplay: plain.headerDisplay,
       accountDisplay: plain.accountDisplay,
       instagramUrl: plain.instagramUrl,
       facebookUrl: plain.facebookUrl,
@@ -132,6 +136,7 @@ export class AdminCommerceSettingsService {
     const commerce = await Commerce.findByPk(this.requireCommerce(commerceId));
     if (!commerce) throw new NotFoundException('Comercio no encontrado');
 
+    if (input.headerDisplay !== undefined && !['logo','logo-name'].includes(input.headerDisplay)) throw new BadRequestException('Elegí cómo mostrar la identidad de la tienda');
     if (input.accountDisplay !== undefined && !['icon','text'].includes(input.accountDisplay)) throw new BadRequestException('Elegí ícono o texto para la cuenta');
     const socialHosts = {instagramUrl:['instagram.com'],facebookUrl:['facebook.com','fb.com'],tiktokUrl:['tiktok.com'],youtubeUrl:['youtube.com','youtu.be']};
     for (const key of Object.keys(socialHosts) as Array<keyof typeof socialHosts>) {
@@ -156,7 +161,7 @@ export class AdminCommerceSettingsService {
     this.validateColor(input.primaryColor, 'El color principal');
     this.validateColor(input.secondaryColor, 'El color secundario');
 
-    for (const [key,limit] of [['heroTitle',180],['heroButtonText',40],['announcementText',160],['name',120],['tagline',180],['logoUrl',500]] as const) {
+    for (const [key,limit] of [['heroTitle',180],['heroButtonText',40],['announcementText',160],['name',120],['tagline',180],['headerTagline',180],['logoUrl',500]] as const) {
       const value=input[key];
       if(value!==undefined && value!==null && (typeof value!=='string' || value.length>limit)) throw new BadRequestException('Texto inválido o demasiado largo');
     }
@@ -203,6 +208,8 @@ export class AdminCommerceSettingsService {
       ...(input.salesEmail !== undefined ? { salesEmail: input.salesEmail?.trim().toLowerCase() || null } : {}),
       ...(name !== undefined ? { name } : {}),
       ...(input.tagline !== undefined ? { tagline: input.tagline?.trim() || null } : {}),
+      ...(input.headerTagline !== undefined ? { headerTagline: input.headerTagline?.trim() || null } : {}),
+      ...(input.headerDisplay !== undefined ? { headerDisplay: input.headerDisplay } : {}),
       ...(input.primaryColor !== undefined ? { primaryColor: input.primaryColor } : {}),
       ...(input.secondaryColor !== undefined ? { secondaryColor: input.secondaryColor } : {}),
       ...(input.logoUrl !== undefined && !logo ? { logoUrl: input.logoUrl?.trim() || null } : {}),
