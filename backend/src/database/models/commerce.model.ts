@@ -4,6 +4,11 @@ export class Commerce extends Model {
   declare id: string;
   declare name: string;
   declare slug: string;
+  declare accountDisplay: string;
+  declare instagramUrl: string | null;
+  declare facebookUrl: string | null;
+  declare tiktokUrl: string | null;
+  declare youtubeUrl: string | null;
   declare heroTitle: string | null;
   declare heroButtonText: string | null;
   declare announcementText: string | null;
@@ -46,6 +51,11 @@ export class Commerce extends Model {
           allowNull: false,
           unique: true,
         },
+        accountDisplay: {type: DataTypes.STRING(20),allowNull:false,defaultValue:'icon',field:'account_display'},
+        instagramUrl: {type: DataTypes.STRING(500),allowNull:true,field:'instagram_url'},
+        facebookUrl: {type: DataTypes.STRING(500),allowNull:true,field:'facebook_url'},
+        tiktokUrl: {type: DataTypes.STRING(500),allowNull:true,field:'tiktok_url'},
+        youtubeUrl: {type: DataTypes.STRING(500),allowNull:true,field:'youtube_url'},
         heroTitle: {type: DataTypes.STRING(180),allowNull:true,field:'hero_title'},
         heroButtonText: {type: DataTypes.STRING(40),allowNull:true,field:'hero_button_text'},
         announcementText: {type: DataTypes.STRING(160),allowNull:true,field:'announcement_text'},

@@ -1,4 +1,6 @@
 'use client';
+import AccountMenu from './store-account-menu';
+import SocialLinks, { whatsappHref } from './store-social-links';
 import CartIcon from './cart-icon';
 import { onColor } from './store-colors';
 import { storeCover } from './store-covers';
@@ -26,14 +28,14 @@ export default function StorefrontClient({demoMode=false}:{demoMode?:boolean}){
       const logo=typeof d.logoUrl==='string' && /^(https?:\/\/|data:image\/(png|jpeg|webp);base64,)/.test(d.logoUrl) ? d.logoUrl : null;
       const cover=typeof d.coverUrl==='string' && /^(https?:\/\/|data:image\/(png|jpeg|webp);base64,|\/covers\/(oak|workshop|home)\.webp$)/.test(d.coverUrl) ? d.coverUrl : '';
       const text=(key:string,max:number)=>typeof d[key]==='string'&&d[key].length<=max?d[key]:null;
-      setDesignPreview({heroTitle:text('heroTitle',180),heroButtonText:text('heroButtonText',40),announcementText:text('announcementText',160),heroLayout:d.heroLayout==='banner'?'banner':'split',backgroundColor:/^#[0-9a-f]{6}$/i.test(d.backgroundColor)?d.backgroundColor:'#f7f9fd',coverPreset:d.coverPreset,coverUrl:cover,hasUploadedCover:false,name:d.name,tagline:d.tagline,primaryColor:d.primaryColor,secondaryColor:d.secondaryColor,fontFamily:d.fontFamily,logoUrl:logo,hasUploadedLogo:false});
+      setDesignPreview({accountDisplay:d.accountDisplay==='text'?'text':'icon',whatsapp:text('whatsapp',60),instagramUrl:text('instagramUrl',500),facebookUrl:text('facebookUrl',500),tiktokUrl:text('tiktokUrl',500),youtubeUrl:text('youtubeUrl',500),heroTitle:text('heroTitle',180),heroButtonText:text('heroButtonText',40),announcementText:text('announcementText',160),heroLayout:d.heroLayout==='banner'?'banner':'split',backgroundColor:/^#[0-9a-f]{6}$/i.test(d.backgroundColor)?d.backgroundColor:'#f7f9fd',coverPreset:d.coverPreset,coverUrl:cover,hasUploadedCover:false,name:d.name,tagline:d.tagline,primaryColor:d.primaryColor,secondaryColor:d.secondaryColor,fontFamily:d.fontFamily,logoUrl:logo,hasUploadedLogo:false});
     };
     const blockActions=(event:Event)=>{
       const target=event.target instanceof Element?event.target.closest('a,button,form'):null;
       if(!target)return;
       if(target instanceof HTMLAnchorElement && target.getAttribute('href')==='#catalogo')return;
       // Filters and sort remain usable; cart and checkout actions stay disabled.
-      if(target.closest('.category-filters,.catalog-toolbar,.store-menu'))return;
+      if(target.closest('.category-filters,.catalog-toolbar,.store-menu,.store-account-trigger'))return;
       event.preventDefault();event.stopPropagation();
     };
     document.addEventListener('click',blockActions,true);
@@ -63,7 +65,7 @@ export default function StorefrontClient({demoMode=false}:{demoMode?:boolean}){
     ? `${API_URL}/catalog/store/${COMMERCE_SLUG}/logo?v=${encodeURIComponent(commerce.updatedAt || "")}`
     : commerce?.logoUrl ?? '';
   const coverSrc=commerce ? (commerce.coverUrl ?? storeCover(commerce)) : '';
-  const whatsappNumber=(commerce?.whatsapp ?? '').replace(/\D/g,'');
+  const whatsappLink=whatsappHref(commerce?.whatsapp);
   const themeStyle={
     '--store-font':storeFont(commerce?.fontFamily),
     '--store-background':commerce?.backgroundColor || '#f7f9fd',
@@ -77,7 +79,7 @@ export default function StorefrontClient({demoMode=false}:{demoMode?:boolean}){
     <div className="store-masthead"><div className="store-announcement">{demoMode?'DEMO INTERACTIVA · RECORRÉ LA TIENDA COMO CLIENTE':(commerce?.announcementText || `${brandName.toUpperCase()} · TIENDA ONLINE`)}</div>
     <header className="store-header">
       <Link href="/tienda" className="store-identity">{logoSrc?<img className="store-logo" src={logoSrc} alt={brandName}/>:<span className="store-monogram" aria-hidden="true">{brandName.charAt(0).toUpperCase()}</span>}<div><div className="store-brand">{brandName}</div><small>{tagline}</small></div></Link>
-      <div className="store-header-actions"><a className="store-nav-link" href="#catalogo">Explorar catálogo</a><Link className="store-nav-link" href={user?'/mi-cuenta':'/cliente/login'}>{user?'Mi cuenta':'Ingresar'}</Link><Link className="store-cart-icon" href="/carrito" aria-label={`Carrito: ${totalItems} productos`} title="Ver carrito"><CartIcon/><span className="cart-count" aria-hidden="true">{totalItems}</span></Link></div>
+      <div className="store-header-actions"><a className="store-nav-link" href="#catalogo">Explorar catálogo</a><AccountMenu display={commerce?.accountDisplay} signedIn={!!user}/><Link className="store-cart-icon" href="/carrito" aria-label={`Carrito: ${totalItems} productos`} title="Ver carrito"><CartIcon/><span className="cart-count" aria-hidden="true">{totalItems}</span></Link></div>
     </header>
     <nav className="store-menu" aria-label="Menú de la tienda"><a href="#catalogo" onClick={()=>setCategory('')}>Todos los productos</a>{catalog.categories.map(c=><a key={c.id} href="#catalogo" aria-current={category===c.id?'true':undefined} onClick={()=>setCategory(c.id)}>{c.name}</a>)}<a href="#contacto-tienda">Contacto</a></nav></div>
     <div className="store-content">
@@ -92,6 +94,6 @@ export default function StorefrontClient({demoMode=false}:{demoMode?:boolean}){
       <div className="category-filters" aria-label="Filtros del catálogo"><button className={!category?'active':''} aria-pressed={!category} onClick={()=>setCategory('')}>Todos</button>{catalog?.categories.map(c=><button key={c.id} className={category===c.id?'active':''} aria-pressed={category===c.id} onClick={()=>setCategory(c.id)}>{c.name}</button>)}<button className={offers?'active offer-filter':'offer-filter'} aria-pressed={offers} onClick={()=>setOffers(!offers)}>Solo ofertas</button></div>
       {error?<div className="store-empty" role="alert"><h3>No pudimos abrir el catálogo</h3><p>{error}</p><button className="btn primary" onClick={()=>setAttempt(n=>n+1)}>Reintentar</button></div>:!catalog?<div className="store-empty" role="status">Estamos preparando el catálogo…</div>:<><div className="product-grid">{products.map(p=><StoreProductCard key={p.id} product={p}/>)}</div>{!products.length&&<div className="store-empty"><h3>{catalog.products.length?'No encontramos coincidencias':'Próximamente, nuevos productos'}</h3><p>{catalog.products.length?'Probá otra búsqueda o cambiá los filtros.':'Volvé a visitarnos para conocer el catálogo.'}</p>{catalog.products.length>0&&<button className="btn secondary" onClick={()=>{setQuery('');setCategory('');setOffers(false);}}>Limpiar filtros</button>}</div>}</>}
     </section>
-    <footer className="store-footer" id="contacto-tienda"><div><strong>{brandName}</strong><p>{commerce?.address || tagline}</p>{commerce?.businessHours&&<small className="store-hours">{commerce.businessHours}</small>}</div>{whatsappNumber&&<a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noreferrer">WhatsApp</a>}{commerce?.contactEmail&&<a href={`mailto:${commerce.contactEmail}`}>{commerce.contactEmail}</a>}<Link href={user?'/mi-cuenta':'/cliente/login'}>{user?'Mi cuenta':'Cuenta cliente'}</Link><Link href="/carrito" aria-label="Ver carrito" title="Ver carrito"><CartIcon/></Link><Link href="/login">Acceso para comercios</Link></footer></div>
+    <footer className="store-footer" id="contacto-tienda"><div><strong>{brandName}</strong><p>{commerce?.address || tagline}</p>{commerce?.businessHours&&<small className="store-hours">{commerce.businessHours}</small>}</div>{commerce&&<SocialLinks commerce={commerce}/>}{commerce?.contactEmail&&<a href={`mailto:${commerce.contactEmail}`}>{commerce.contactEmail}</a>}<Link href={user?'/mi-cuenta':'/cliente/login'}>{user?'Mi cuenta':'Cuenta cliente'}</Link><Link href="/carrito" aria-label="Ver carrito" title="Ver carrito"><CartIcon/></Link><Link href="/login">Acceso para comercios</Link></footer>{whatsappLink&&<a className="store-whatsapp-button" href={whatsappLink} target="_blank" rel="noopener noreferrer" aria-label="Contactar al comercio por WhatsApp">WhatsApp ↗</a>}</div>
   </div>;
 }

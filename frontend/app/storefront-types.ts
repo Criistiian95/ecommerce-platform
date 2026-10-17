@@ -25,6 +25,11 @@ export type StoreCatalog = {
     slug: string;
     tagline?: string | null;
     fontFamily?: string;
+    accountDisplay?: string;
+    instagramUrl?: string | null;
+    facebookUrl?: string | null;
+    tiktokUrl?: string | null;
+    youtubeUrl?: string | null;
     heroTitle?: string | null;
     heroButtonText?: string | null;
     announcementText?: string | null;

@@ -2,6 +2,11 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { Commerce } from '../database/models/commerce.model';
 
 export type CommerceSettingsInput = {
+  accountDisplay?: string;
+  instagramUrl?: string | null;
+  facebookUrl?: string | null;
+  tiktokUrl?: string | null;
+  youtubeUrl?: string | null;
   heroTitle?: string | null;
   heroButtonText?: string | null;
   announcementText?: string | null;
@@ -87,6 +92,11 @@ export class AdminCommerceSettingsService {
       name: plain.name,
       slug: plain.slug,
       tagline: plain.tagline,
+      accountDisplay: plain.accountDisplay,
+      instagramUrl: plain.instagramUrl,
+      facebookUrl: plain.facebookUrl,
+      tiktokUrl: plain.tiktokUrl,
+      youtubeUrl: plain.youtubeUrl,
       heroTitle: plain.heroTitle,
       heroButtonText: plain.heroButtonText,
       announcementText: plain.announcementText,
@@ -122,6 +132,20 @@ export class AdminCommerceSettingsService {
     const commerce = await Commerce.findByPk(this.requireCommerce(commerceId));
     if (!commerce) throw new NotFoundException('Comercio no encontrado');
 
+    if (input.accountDisplay !== undefined && !['icon','text'].includes(input.accountDisplay)) throw new BadRequestException('Elegí ícono o texto para la cuenta');
+    const socialHosts = {instagramUrl:['instagram.com'],facebookUrl:['facebook.com','fb.com'],tiktokUrl:['tiktok.com'],youtubeUrl:['youtube.com','youtu.be']};
+    for (const key of Object.keys(socialHosts) as Array<keyof typeof socialHosts>) {
+      const value = input[key];
+      if (value === undefined || value === null || value === '') continue;
+      try {
+        if (typeof value !== 'string' || value.length > 500) throw new Error();
+        const url = new URL(value.trim());
+        if (url.protocol !== 'https:' || url.username || url.password || !socialHosts[key].some(host=>url.hostname===host || url.hostname.endsWith('.'+host))) throw new Error();
+      } catch { throw new BadRequestException('Usá un enlace https:// válido de la red social elegida'); }
+    }
+    if (input.whatsapp !== undefined && input.whatsapp !== null && input.whatsapp !== '') {
+      if (typeof input.whatsapp !== 'string' || input.whatsapp.length > 60 || !/^[+\d\s()-]+$/.test(input.whatsapp) || !/^\d{7,15}$/.test(input.whatsapp.replace(/\D/g,''))) throw new BadRequestException('WhatsApp: ingresá el número con código de país, por ejemplo 5491112345678');
+    }
     if(input.heroLayout!==undefined && !['split','banner'].includes(input.heroLayout)) throw new BadRequestException('Diseño de portada inválido');
     if(input.fontFamily!==undefined && !['modern','classic','friendly','mono'].includes(input.fontFamily)) throw new BadRequestException('Tipografía inválida');
     this.validateColor(input.backgroundColor, 'El color de fondo');
@@ -161,6 +185,12 @@ export class AdminCommerceSettingsService {
       throw new BadRequestException('El email para avisos de venta no es válido');
     }
     await commerce.update({
+      ...(input.accountDisplay !== undefined ? {accountDisplay:input.accountDisplay} : {}),
+      ...(input.instagramUrl !== undefined ? {instagramUrl:input.instagramUrl?.trim() || null} : {}),
+      ...(input.facebookUrl !== undefined ? {facebookUrl:input.facebookUrl?.trim() || null} : {}),
+      ...(input.tiktokUrl !== undefined ? {tiktokUrl:input.tiktokUrl?.trim() || null} : {}),
+      ...(input.youtubeUrl !== undefined ? {youtubeUrl:input.youtubeUrl?.trim() || null} : {}),
+
       ...(input.heroTitle !== undefined ? {heroTitle: input.heroTitle?.trim() || null} : {}),
       ...(input.heroButtonText !== undefined ? {heroButtonText: input.heroButtonText?.trim() || null} : {}),
       ...(input.announcementText !== undefined ? {announcementText: input.announcementText?.trim() || null} : {}),
