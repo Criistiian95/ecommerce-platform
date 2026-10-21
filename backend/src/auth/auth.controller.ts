@@ -98,6 +98,13 @@ export class AuthController {
     return this.auth.updateCustomerProfile(req.auth!.userId, body);
   }
 
+  @Post('admin/logout')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('admin','superadmin','operator')
+  adminLogout(@Req() req: AuthenticatedRequest) {
+    return this.auth.logout(req.auth!.sessionId);
+  }
+
   @Post('logout')
   logout(@Body() body: { sessionId: string }) {
     return this.auth.logout(body.sessionId);
