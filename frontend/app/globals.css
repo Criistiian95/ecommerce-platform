@@ -202,3 +202,15 @@ button,input,textarea,select{font:inherit}button,a,input,textarea,select{-webkit
 .storefront-page .cfz-storefront .cfz-identity .cfz-tagline{display:block;max-width:160px;font-size:10px;line-height:1.2}
 .storefront-page .cfz-storefront .store-account-dropdown{top:100%}
 @media(max-width:760px){.storefront-page .cfz-storefront .cfz-identity{margin:4px 0 4px 16px;align-items:flex-start;text-align:left}.storefront-page .cfz-storefront .cfz-identity .store-logo{height:41px;max-width:85px}.storefront-page .cfz-storefront .cfz-identity .cfz-tagline{display:block;font-size:10px;max-width:145px}}
+
+/* Merchant access uses stable, high-contrast colors independent of storefront branding. */
+.merchant-login{width:calc(100% - 32px);margin:clamp(24px,8vh,80px) auto}
+.merchant-login .merchant-login-submit{width:100%;background:#17365d;color:#fff;border:1px solid #17365d}
+.merchant-login .merchant-login-submit:hover:not(:disabled){background:#102744;border-color:#102744}
+.merchant-login .merchant-login-submit:focus-visible{outline-color:#245ce6;outline-offset:3px}
+.merchant-login .merchant-login-submit:disabled{background:#516782;border-color:#516782;color:#fff;opacity:1;cursor:wait}
+.merchant-login-message{color:#9f2335;background:#fff2f3;border:1px solid #f3d1d7;border-radius:10px;padding:12px;font-size:14px}
+.admin-nav .admin-logout-button{gap:7px;background:#fff1f2;color:#9f2335;border:1px solid #f3c9d0;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.admin-nav .admin-logout-button:hover:not(:disabled){background:#ffe4e8;color:#821b2b;border-color:#e9a7b4}
+.admin-nav .admin-logout-button:focus-visible{outline-color:#9f2335;outline-offset:3px}
+.admin-nav .admin-logout-button:disabled{cursor:wait;opacity:.75}
