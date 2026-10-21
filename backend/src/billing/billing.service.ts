@@ -23,9 +23,10 @@ export class BillingService {
   if(current?.mpSubscriptionId) throw new ServiceUnavailableException('La suscripción requiere revisión');
   const url=(process.env.FRONTEND_URL||'').replace(/\/$/,'');
   if(!url.startsWith('https://')) throw new ServiceUnavailableException('FRONTEND_URL debe ser HTTPS');
+  if(!/^https:\/\/[^\s/]+\/billing\/webhook$/.test((process.env.BILLING_WEBHOOK_URL||'').trim())) throw new ServiceUnavailableException('BILLING_WEBHOOK_URL inválida o sin configurar');
   const body={reason:'Diseñolys - Tienda Online',external_reference:commerce.id,payer_email:payerEmail,
    auto_recurring:{frequency:1,frequency_type:'months',transaction_amount:BILLING_MONTHLY_ARS,currency_id:'ARS'},
-   back_url:url+'/registro/resultado',status:'pending'};
+   back_url:url+'/registro/resultado',notification_url:(process.env.BILLING_WEBHOOK_URL||'').trim(),status:'pending'};
   const result=await this.mp('/preapproval',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const owner=await this.mp('/users/me');
   if(String(result.collector_id)!==String(owner.id)) throw new ServiceUnavailableException('La suscripción apunta a otra cuenta receptora');
