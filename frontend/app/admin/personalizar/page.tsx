@@ -1,3 +1,4 @@
+import AdminLogoutButton from '../logout-button';
 'use client';
 import Link from 'next/link';
 import { transparentLogo } from '../../logo-background';
@@ -84,7 +85,7 @@ export default function Personalizar(){
     }catch(e){setError(e instanceof Error?e.message:'No se pudo guardar. Tus cambios siguen en la vista previa.');}finally{setSaving(false);}
   }
   if(!loaded)return <main className="shell">Cargando…</main>;
-  if(!token)return <main className="shell"><h1>Personalizar mi tienda</h1><p>Ingresá con tu cuenta de administrador.</p><Link href="/login">Iniciar sesión</Link></main>;
+  if(!token)return <main className="shell"><div style={{display:"flex",justifyContent:"flex-end"}}><AdminLogoutButton /></div><h1>Personalizar mi tienda</h1><p>Ingresá con tu cuenta de administrador.</p><Link href="/login">Iniciar sesión</Link></main>;
   const storePath=isTenantDomain?'/':`/tienda/${encodeURIComponent(settings?.slug||'')}`;
   return <main className={styles.page}>
     <header className={styles.header}><Link href="/admin/dashboard">← Panel del comercio</Link><strong>DISEÑOLYS</strong><Link href="/admin/configuracion">Configuración y cobros</Link></header>
