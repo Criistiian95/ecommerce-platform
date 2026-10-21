@@ -1,3 +1,4 @@
+import {BillingService} from '../billing/billing.service';
 import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
@@ -12,7 +13,7 @@ import { Order } from '../database/models/order.model';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly db: DatabaseService,private readonly billing:BillingService) {}
 
   private async createSession(user: User) {
     const sessionId = randomUUID();
@@ -68,6 +69,14 @@ export class AuthService {
     if (!password || !users.length) throw new UnauthorizedException('Credenciales inválidas');
     for (const user of users) {
       if (await bcrypt.compare(password, user.passwordHash)) {
+        if(user.commerceId){
+          const owner=await Commerce.findByPk(user.commerceId);
+          if(owner && !owner.active) {
+            if(user.role!=='admin') throw new UnauthorizedException('Tienda pendiente de pago');
+            const checkout=await this.billing.createMerchantSubscription(owner.id,user.email);
+            return {billingRequired:true,commerceSlug:owner.slug,...checkout};
+          }
+        }
         return this.createSession(user);
       }
     }
@@ -242,11 +251,18 @@ export class AuthService {
     if(await Commerce.findOne({where:{slug},attributes:['id']})) throw new ConflictException('Ese identificador de tienda ya está en uso');
     const passwordHash=await bcrypt.hash(password,12);
     try {
-      return await this.db.sequelize.transaction(async transaction=>{
-        const commerce=await Commerce.create({name,slug,active:true},{transaction});
+      const registered=await this.db.sequelize.transaction(async transaction=>{
+        const commerce=await Commerce.create({name,slug,active:false},{transaction});
         await User.create({commerceId:commerce.id,name:adminName,email,passwordHash,role:'admin',active:true},{transaction});
-        return {ok:true,commerce:{name,slug}};
+        return {ok:true,commerce:{id:commerce.id,name,slug}};
       });
+      // Mercado Pago is an external service. A failed checkout never activates the store.
+      try {
+        const checkout=await this.billing.createMerchantSubscription(registered.commerce.id,email);
+        return {ok:true,status:'pending_payment',commerce:{name,slug},...checkout};
+      } catch {
+        return {ok:true,status:'pending_payment',commerce:{name,slug},message:'La tienda está registrada y pendiente de pago. Iniciá sesión para reintentar el checkout.'};
+      }
     } catch(error) {
       if((error as Error).name==='SequelizeUniqueConstraintError') throw new ConflictException('Ese identificador de tienda ya está en uso');
       throw error;
