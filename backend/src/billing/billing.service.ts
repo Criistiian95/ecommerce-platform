@@ -15,6 +15,25 @@ export class BillingService {
   if(!res.ok) throw new ServiceUnavailableException('No se pudo verificar la suscripción con Mercado Pago');
   return data;
  }
+ async createMerchantSubscription(commerceId:string,payerEmail:string) {
+  const commerce=await Commerce.findByPk(commerceId);
+  if(!commerce || commerce.active) throw new BadRequestException('Comercio no elegible para el alta');
+  const current=await BillingSubscription.findByPk(commerceId);
+  if(current?.checkoutUrl && current.mpSubscriptionId) return {checkoutUrl:current.checkoutUrl,status:current.status};
+  if(current?.mpSubscriptionId) throw new ServiceUnavailableException('La suscripción requiere revisión');
+  const url=(process.env.FRONTEND_URL||'').replace(/\/$/,'');
+  if(!url.startsWith('https://')) throw new ServiceUnavailableException('FRONTEND_URL debe ser HTTPS');
+  const body={reason:'Diseñolys - Tienda Online',external_reference:commerce.id,payer_email:payerEmail,
+   auto_recurring:{frequency:1,frequency_type:'months',transaction_amount:BILLING_MONTHLY_ARS,currency_id:'ARS'},
+   back_url:url+'/registro/resultado',status:'pending'};
+  const result=await this.mp('/preapproval',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!result.id||!result.init_point||!/^https:\/\//.test(result.init_point)||
+    String(result.external_reference)!==commerce.id||Number(result.auto_recurring?.transaction_amount)!==BILLING_MONTHLY_ARS)
+    throw new ServiceUnavailableException('La respuesta de Mercado Pago requiere revisión');
+  await BillingSubscription.create({commerceId,payerEmail,mpSubscriptionId:String(result.id),checkoutUrl:result.init_point,
+    amountArs:BILLING_MONTHLY_ARS,status:'pending',paidThrough:null,startedAt:null});
+  return {checkoutUrl:result.init_point,status:'pending'};
+ }
  async subscription(commerceId:string){
   const billing=await BillingSubscription.findByPk(commerceId);
   return billing?{status:billing.status,amountArs:billing.amountArs,paidThrough:billing.paidThrough,checkoutUrl:billing.checkoutUrl}:null;
