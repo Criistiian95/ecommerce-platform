@@ -259,7 +259,7 @@ export class AuthService {
       // Mercado Pago is an external service. A failed checkout never activates the store.
       try {
         const checkout=await this.billing.createMerchantSubscription(registered.commerce.id,email);
-        return {ok:true,status:'pending_payment',commerce:{name,slug},...checkout};
+        return {ok:true,commerce:{name,slug},...checkout};
       } catch {
         return {ok:true,status:'pending_payment',commerce:{name,slug},message:'La tienda está registrada y pendiente de pago. Iniciá sesión para reintentar el checkout.'};
       }
