@@ -20,7 +20,8 @@ export class BillingController {
   const secret=process.env.MP_SUBSCRIPTIONS_WEBHOOK_SECRET||'';
   if(!verifyMpWebhook(secret,signature,requestId,id)) return {ok:false};
   // No changes if the event is not a real subscription invoice.
-  if(type!=='subscription_authorized_payment' && type!=='authorized_payment') return {ok:true,ignored:true};
+  const eventType=type || String((req.body as any)?.type || (req.body as any)?.topic || '');
+  if(eventType!=='subscription_authorized_payment' && eventType!=='authorized_payment') return {ok:true,ignored:true};
   try {return {ok:true,...await this.billing.settleAuthorizedPayment(id)};}
   catch {return {ok:false,retry:true};}
  }
