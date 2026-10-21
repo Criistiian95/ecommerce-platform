@@ -257,7 +257,7 @@ export class AuthService {
         await User.create({commerceId:commerce.id,name:adminName,email,passwordHash,role:'admin',active:true},{transaction});
         return {ok:true,commerce:{id:commerce.id,name,slug}};
       });
-      if(process.env.BILLING_ENABLED!=='true') return {ok:true,commerce:{name,slug}};
+      if(process.env.BILLING_ENABLED!=='true') return {ok:true,status:'active',commerce:{name,slug}};
       // Mercado Pago is an external service. A failed checkout never activates the store.
       try {
         const checkout=await this.billing.createMerchantSubscription(registered.commerce.id,email);
