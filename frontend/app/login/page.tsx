@@ -33,6 +33,8 @@ export default function LoginPage() {
     }
 
     const data = await response.json();
+    if(data.billingRequired){ if(data.checkoutUrl){window.location.assign(data.checkoutUrl);return;} setMessage('Tu tienda está pendiente de pago. Reintentá en unos minutos.');return; }
+    if(!data.token){setMessage('No se pudo abrir una sesión válida.');return;}
     localStorage.setItem('ecommerce_token', data.token);
 
     if (data.user.role === 'admin' || data.user.role === 'superadmin') {
