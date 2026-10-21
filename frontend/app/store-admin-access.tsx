@@ -9,7 +9,7 @@ export default function StoreAdminAccess(){
  const [url,setUrl]=useState('/login');
  const [label,setLabel]=useState('Acceso para comercios');
  useEffect(()=>{
-  const adminOrigin=process.env.NEXT_PUBLIC_ADMIN_ORIGIN?.replace(/\\/$/,'') || 'https://ecommerce-platform-web.onrender.com';
+  const adminOrigin=process.env.NEXT_PUBLIC_ADMIN_ORIGIN?.replace(/\/$/,'') || 'https://ecommerce-platform-web.onrender.com';
   if(isTenantDomain){
    setUrl(`${adminOrigin}/admin/dashboard`);
    setLabel('Ir al panel del comercio');
