@@ -9,10 +9,10 @@ export default function StoreAdminAccess(){
  const [url,setUrl]=useState('/login');
  const [label,setLabel]=useState('Acceso para comercios');
  useEffect(()=>{
-  const mainHost=process.env.NEXT_PUBLIC_PLATFORM_HOST?.trim() || 'disenolys.store';
+  const adminOrigin=process.env.NEXT_PUBLIC_ADMIN_ORIGIN?.replace(/\\/$/,'') || 'https://ecommerce-platform-web.onrender.com';
   if(isTenantDomain){
-   setUrl(`https://${mainHost}/admin/dashboard`);
-   setLabel('Panel del comercio');
+   setUrl(`${adminOrigin}/admin/dashboard`);
+   setLabel('Ir al panel del comercio');
    return;
   }
   const hasSession=Boolean(localStorage.getItem('ecommerce_token'));
