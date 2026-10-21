@@ -1,3 +1,4 @@
+import AdminLogoutButton from '../logout-button';
 'use client';
 import AdminStoreLink from '../store-link';
 
@@ -192,6 +193,7 @@ export default function AdminOrdersPage() {
           <small>Gestión de pedidos y ventas</small>
         </div>
         <nav className="admin-nav" aria-label="Navegación del panel">
+          <AdminLogoutButton />
           <Link className="admin-nav-link" href="/admin/dashboard">Dashboard</Link>
           <Link className="admin-nav-link" href="/admin">Productos</Link>
           <Link className="admin-nav-link active" href="/admin/pedidos">Pedidos</Link>
