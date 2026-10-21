@@ -125,17 +125,10 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       },
     });
 
-    const existingUser = await User.findOne({ where: { email: adminEmail } });
-    if (existingUser) {
-      if (existingUser.commerceId !== commerce.id || existingUser.role !== 'admin') {
-        await existingUser.update({
-          commerceId: commerce.id,
-          role: 'admin',
-          active: true,
-        });
-      }
-      return;
-    }
+    const existingUser = await User.findOne({ where: { commerceId: commerce.id, email: adminEmail } });
+    if (existingUser) return;
+    const conflictingUser = await User.findOne({ where: { email: adminEmail } });
+    if (conflictingUser) throw new Error('Bootstrap administrator already belongs to another commerce');
 
     const passwordHash = await bcrypt.hash(adminPassword, 12);
     await User.create({
