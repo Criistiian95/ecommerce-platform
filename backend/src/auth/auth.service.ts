@@ -72,6 +72,7 @@ export class AuthService {
         if(user.commerceId){
           const owner=await Commerce.findByPk(user.commerceId);
           if(owner && !owner.active) {
+            if(process.env.BILLING_ENABLED!=='true') throw new UnauthorizedException('La tienda está deshabilitada');
             if(user.role!=='admin') throw new UnauthorizedException('Tienda pendiente de pago');
             const checkout=await this.billing.createMerchantSubscription(owner.id,user.email);
             return {billingRequired:true,commerceSlug:owner.slug,...checkout};
@@ -252,10 +253,11 @@ export class AuthService {
     const passwordHash=await bcrypt.hash(password,12);
     try {
       const registered=await this.db.sequelize.transaction(async transaction=>{
-        const commerce=await Commerce.create({name,slug,active:false},{transaction});
+        const commerce=await Commerce.create({name,slug,active:process.env.BILLING_ENABLED!=='true'},{transaction});
         await User.create({commerceId:commerce.id,name:adminName,email,passwordHash,role:'admin',active:true},{transaction});
         return {ok:true,commerce:{id:commerce.id,name,slug}};
       });
+      if(process.env.BILLING_ENABLED!=='true') return {ok:true,commerce:{name,slug}};
       // Mercado Pago is an external service. A failed checkout never activates the store.
       try {
         const checkout=await this.billing.createMerchantSubscription(registered.commerce.id,email);
