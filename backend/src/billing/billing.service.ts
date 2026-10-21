@@ -90,7 +90,7 @@ export class BillingService {
   if(!/^\d+$/.test(paymentId)) return {processed:false};
   const payment=await this.mp('/v1/payments/'+paymentId);
   if(payment.status!=='approved'||payment.currency_id!=='ARS'||Number(payment.transaction_amount)!==BILLING_MONTHLY_ARS ||
-     String(payment.id)!==paymentId || String(payment.external_reference||'')!==String(invoice.external_reference||'') && !!invoice.external_reference) return {processed:false};
+     String(payment.id)!==paymentId) return {processed:false};
   const owner=await this.mp('/users/me');
   if(String(subscription.collector_id)!==String(owner.id)) return {processed:false};
   if(String(payment.collector_id)!==String(owner.id)) return {processed:false};
