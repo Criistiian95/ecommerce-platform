@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "plugins": [],
+    "paths": {
+      "next/link": ["./link.tsx"],
+      "next/navigation": ["./navigation.tsx"]
+    }
+  },
+  "include": ["./**/*.ts", "./**/*.tsx", "../next-env.d.ts"],
+  "exclude": ["../node_modules"]
+}

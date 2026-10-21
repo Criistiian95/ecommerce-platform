@@ -1,0 +1,37 @@
+# Separate preview only. Does not modify the existing web/API services or domains.
+services:
+  - type: web
+    name: disenolys-static-preview
+    runtime: static
+    repo: https://github.com/Criistiian95/ecommerce-platform
+    branch: codex/static-frontend-preview
+    buildCommand: cd frontend && npm ci && npm run build:static
+    staticPublishPath: frontend/dist-static
+    autoDeployTrigger: off
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEXT_PUBLIC_API_URL
+        value: https://ecommerce-platform-api-2kh1.onrender.com
+      - key: NEXT_PUBLIC_STOREFRONT_DOMAIN
+        value: disenolys.store
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Robots-Tag
+        value: noindex, nofollow
+      - path: /*
+        name: Referrer-Policy
+        value: no-referrer
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache
