@@ -1,4 +1,4 @@
-import {Controller,Get,Headers,HttpCode,Post,Query,Req} from '@nestjs/common';
+import {Controller,Headers,HttpCode,HttpException,Post,Query,Req} from '@nestjs/common';
 import type {Request} from 'express';
 import {BillingService} from './billing.service';
 import {verifyMpWebhook} from './billing-rules';
@@ -23,6 +23,6 @@ export class BillingController {
   const eventType=type || String((req.body as any)?.type || (req.body as any)?.topic || '');
   if(eventType!=='subscription_authorized_payment' && eventType!=='authorized_payment') return {ok:true,ignored:true};
   try {return {ok:true,...await this.billing.settleAuthorizedPayment(id)};}
-  catch {return {ok:false,retry:true};}
+  catch {throw new HttpException('Reintentar notificación',503);}
  }
 }
