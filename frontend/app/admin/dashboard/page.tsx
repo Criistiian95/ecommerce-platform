@@ -1,4 +1,5 @@
 'use client';
+import AdminLogoutButton from '../logout-button';
 import AdminStoreLink from '../store-link';
 
 import Link from 'next/link';
@@ -113,6 +114,7 @@ export default function AdminDashboardPage(){
           <small>Resumen general del negocio</small>
         </div>
         <nav className="admin-nav" aria-label="Navegación del panel">
+          <AdminLogoutButton />
           <Link className="admin-nav-link active" href="/admin/dashboard">Dashboard</Link>
           <Link className="admin-nav-link" href="/admin">Productos</Link>
           <Link className="admin-nav-link" href="/admin/pedidos">Pedidos</Link>
