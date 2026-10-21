@@ -11,7 +11,7 @@ export default function StoreAdminAccess() {
   useEffect(() => {
     if (isTenantDomain) {
       const origin = (process.env.NEXT_PUBLIC_ADMIN_ORIGIN || 'https://ecommerce-platform-web.onrender.com').replace(/\/$/, '');
-      setHref(`${origin}/login?commerceSlug=${encodeURIComponent(slug)}`);
+      setHref(`${origin}/admin/dashboard`);
       setLabel('Panel del comercio');
       return;
     }
