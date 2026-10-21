@@ -68,6 +68,7 @@ export class AuthService {
     if (!password || !users.length) throw new UnauthorizedException('Credenciales inválidas');
     for (const user of users) {
       if (await bcrypt.compare(password, user.passwordHash)) {
+        if (user.commerceId && !await Commerce.findOne({where:{id:user.commerceId,active:true}})) throw new UnauthorizedException('Tienda pendiente de pago o suspendida');
         return this.createSession(user);
       }
     }
@@ -243,9 +244,9 @@ export class AuthService {
     const passwordHash=await bcrypt.hash(password,12);
     try {
       return await this.db.sequelize.transaction(async transaction=>{
-        const commerce=await Commerce.create({name,slug,active:true},{transaction});
+        const commerce=await Commerce.create({name,slug,active:false},{transaction});
         await User.create({commerceId:commerce.id,name:adminName,email,passwordHash,role:'admin',active:true},{transaction});
-        return {ok:true,commerce:{name,slug}};
+        return {ok:true,status:'pending_payment',message:'La tienda se habilitará después de verificar el pago del abono.',commerce:{name,slug}};
       });
     } catch(error) {
       if((error as Error).name==='SequelizeUniqueConstraintError') throw new ConflictException('Ese identificador de tienda ya está en uso');
