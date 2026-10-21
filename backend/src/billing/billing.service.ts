@@ -37,6 +37,20 @@ export class BillingService {
     amountArs:BILLING_MONTHLY_ARS,status:'pending',paidThrough:null,startedAt:null});
   return {checkoutUrl:result.init_point,status:'pending'};
  }
+ async reconcileSubscription(preapprovalId:string) {
+  if(!/^[a-z0-9-]{5,100}$/i.test(preapprovalId)) throw new BadRequestException('Suscripción inválida');
+  const row=await BillingSubscription.findOne({where:{mpSubscriptionId:preapprovalId}});
+  if(!row) return {processed:false};
+  const url='/authorized_payments/search?'+new URLSearchParams({preapproval_id:preapprovalId,limit:'100'}).toString();
+  const list=await this.mp(url);
+  if(!Array.isArray(list.results)||!Number.isSafeInteger(Number(list.paging?.total))||
+     Number(list.paging.total)>list.results.length) throw new ServiceUnavailableException('Resultado incompleto; se requiere reintentar');
+  let processed=false;
+  for(const invoice of list.results){
+    if(invoice.payment?.status==='approved' && invoice.id && (await this.settleAuthorizedPayment(String(invoice.id))).processed) processed=true;
+  }
+  return {processed};
+ }
  async reconcileOverdue() {
   const {Op}=await import('sequelize');
   const cutoff=new Date(Date.now()-7*24*60*60*1000);
