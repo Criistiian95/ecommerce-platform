@@ -1,0 +1,65 @@
+import {BadRequestException,Injectable,ServiceUnavailableException} from '@nestjs/common';
+import {Commerce} from '../database/models/commerce.model';
+import {BillingSubscription} from '../database/models/billing-subscription.model';
+import {BillingPayment} from '../database/models/billing-payment.model';
+import {BILLING_MONTHLY_ARS,nextPaidThrough} from './billing-rules';
+import {DatabaseService} from '../database/database.service';
+
+@Injectable()
+export class BillingService {
+ constructor(private readonly db:DatabaseService){}
+ private token(){const token=process.env.MP_SUBSCRIPTIONS_ACCESS_TOKEN; if(!token) throw new ServiceUnavailableException('Falta configurar Mercado Pago de Diseñolys');return token;}
+ private async mp(path:string,options:RequestInit={}):Promise<any> {
+  const res=await fetch('https://api.mercadopago.com'+path,{...options,signal:AbortSignal.timeout(15000),headers:{Authorization:'Bearer '+this.token(),Accept:'application/json',...options.headers}});
+  const data=await res.json().catch(()=>null);
+  if(!res.ok) throw new ServiceUnavailableException('No se pudo verificar la suscripción con Mercado Pago');
+  return data;
+ }
+ async subscription(commerceId:string){
+  const billing=await BillingSubscription.findByPk(commerceId);
+  return billing?{status:billing.status,amountArs:billing.amountArs,paidThrough:billing.paidThrough,checkoutUrl:billing.checkoutUrl}:null;
+ }
+ async verifySubscription(mpId:string){
+  if(!/^[a-z0-9-]{5,100}$/i.test(mpId)) throw new BadRequestException('ID inválido');
+  const remote=await this.mp('/preapproval/'+encodeURIComponent(mpId));
+  const billing=await BillingSubscription.findOne({where:{mpSubscriptionId:mpId}});
+  if(!billing || String(remote.id)!==mpId || remote.status!=='authorized' || remote.payer_email?.toLowerCase()!==billing.payerEmail.toLowerCase() ||
+     remote.auto_recurring?.currency_id!=='ARS' || Number(remote.auto_recurring?.transaction_amount)!==billing.amountArs ||
+     remote.auto_recurring?.frequency!==1 || remote.auto_recurring?.frequency_type!=='months') return {verified:false};
+  // Authorization alone does not prove a successful debit: activation is exclusively tied to verified payment.
+  return {verified:true,paidThrough:billing.paidThrough};
+ }
+ async settleAuthorizedPayment(invoiceId:string) {
+  if(!/^\d{1,30}$/.test(invoiceId)) throw new BadRequestException('Identificador de cobro inválido');
+  const invoice=await this.mp('/authorized_payments/'+invoiceId);
+  const subId=String(invoice.preapproval_id||'');
+  if(!subId) return {processed:false};
+  const sub=await BillingSubscription.findOne({where:{mpSubscriptionId:subId}});
+  if(!sub) return {processed:false};
+  const subscription=await this.mp('/preapproval/'+encodeURIComponent(subId));
+  if(subscription.status!=='authorized' || subscription.payer_email?.toLowerCase()!==sub.payerEmail.toLowerCase() ||
+     subscription.auto_recurring?.currency_id!=='ARS'||Number(subscription.auto_recurring?.transaction_amount)!==BILLING_MONTHLY_ARS ||
+     subscription.auto_recurring?.frequency!==1 || subscription.auto_recurring?.frequency_type!=='months') return {processed:false};
+  // Subscription authorization and authorized-payment authorization are different states.
+  const paymentId=String(invoice.payment?.id||invoice.payment_id||'');
+  if(!/^\d+$/.test(paymentId)) return {processed:false};
+  const payment=await this.mp('/v1/payments/'+paymentId);
+  if(payment.status!=='approved'||payment.currency_id!=='ARS'||Number(payment.transaction_amount)!==BILLING_MONTHLY_ARS ||
+     String(payment.id)!==paymentId || String(payment.external_reference||'')!==String(invoice.external_reference||'') && !!invoice.external_reference) return {processed:false};
+  const owner=await this.mp('/users/me');
+  if(String(payment.collector_id)!==String(owner.id)) return {processed:false};
+  const approved=new Date(payment.date_approved||0);
+  if(!Number.isFinite(approved.getTime())||approved>new Date()) return {processed:false};
+  const result=await this.db.sequelize.transaction(async transaction=>{
+    const locked=await BillingSubscription.findByPk(sub.commerceId,{transaction,lock:transaction.LOCK.UPDATE});
+    if(!locked || locked.mpSubscriptionId!==subId) return false;
+    if(await BillingPayment.findOne({where:{mpInvoiceId:invoiceId},transaction})) return false;
+    await BillingPayment.create({commerceId:locked.commerceId,mpInvoiceId:invoiceId,mpPaymentId:paymentId,approvedAt:approved},{transaction});
+    const paidThrough=nextPaidThrough(locked.paidThrough,approved);
+    await locked.update({status:'active',paidThrough,startedAt:locked.startedAt||approved},{transaction});
+    await Commerce.update({active:true},{where:{id:locked.commerceId},transaction});
+    return true;
+  });
+  return {processed:result};
+ }
+}
