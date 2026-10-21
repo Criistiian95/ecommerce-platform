@@ -22,3 +22,11 @@ La variable pública `NEXT_PUBLIC_BILLING_ENABLED` del **frontend** debe coincid
 7. Activar la conciliación periódica solo después de comprobar que los impagos se desactivan sin pérdida de datos.
 
 **Nunca compartir credenciales en GitHub o el chat.** No confundir estas variables con las que usa cada comercio para cobrar sus ventas.
+
+
+## Prueba con el proveedor
+
+El procedimiento reproducible está en [BILLING_TEST_RUNBOOK.md](BILLING_TEST_RUNBOOK.md).
+Incluye una comprobación de solo lectura de la configuración y de la cuenta vendedora.
+Pasar esa comprobación o las pruebas simuladas de CI **no equivale** a validar un cobro,
+la entrega de notificaciones ni la activación de una tienda con Mercado Pago.
