@@ -21,7 +21,11 @@ export class BillingController {
   if(!verifyMpWebhook(secret,signature,requestId,id)) throw new HttpException('Firma de webhook inválida',401);
   // No changes if the event is not a real subscription invoice.
   const eventType=type || String((req.body as any)?.type || (req.body as any)?.topic || '');
-  if(eventType==='subscription_preapproval' || eventType==='subscription_preapproval_plan') return {ok:true,ignored:true};
+  if(eventType==='subscription_preapproval_plan') return {ok:true,ignored:true};
+  if(eventType==='subscription_preapproval') {
+    try {return {ok:true,...await this.billing.reconcileSubscription(id)};}
+    catch {throw new HttpException('Reintentar notificación',503);}
+  }
   if(eventType!=='subscription_authorized_payment') return {ok:true,ignored:true};
   try {return {ok:true,...await this.billing.settleAuthorizedPayment(id)};}
   catch {throw new HttpException('Reintentar notificación',503);}
