@@ -8,6 +8,7 @@ import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { Session } from '../database/models/session.model';
 import { User } from '../database/models/user.model';
+import { Commerce } from '../database/models/commerce.model';
 
 export type AuthenticatedRequest = Request & {
   auth?: {
@@ -42,6 +43,10 @@ export class AuthGuard implements CanActivate {
         attributes: ['id'],
       });
       if (!user) throw new UnauthorizedException('Sesión inválida');
+      if (payload.commerceId) {
+        const commerce = await Commerce.findOne({where:{id:payload.commerceId,active:true},attributes:['id']});
+        if (!commerce) throw new UnauthorizedException('La tienda está pendiente de pago o suspendida');
+      }
 
       request.auth = {
         userId: payload.sub,

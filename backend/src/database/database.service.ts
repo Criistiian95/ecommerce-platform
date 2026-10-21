@@ -1,3 +1,5 @@
+import {BillingSubscription} from './models/billing-subscription.model';
+import {BillingPayment} from './models/billing-payment.model';
 import { MpConnection, MpOAuthState } from './models/mp-connection.model';
 import { assertMigrationsCurrent } from './migrations/runner';
 import { OrderEmailDelivery } from './models/order-email-delivery.model';
@@ -37,6 +39,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     });
 
     Commerce.register(this.sequelize);
+    BillingSubscription.register(this.sequelize);
+    BillingPayment.register(this.sequelize);
     MpConnection.register(this.sequelize);
     MpOAuthState.register(this.sequelize);
     User.register(this.sequelize);

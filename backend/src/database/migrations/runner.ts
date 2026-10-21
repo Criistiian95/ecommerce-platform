@@ -5,7 +5,7 @@ import { baseline } from './baseline';
 import { passwordRecoverySchema } from './password-recovery';
 
 type Query = (sql: string, values?: unknown[]) => Promise<any[]>;
-const versions = ['001_baseline', '002_legacy_checkout', '003_email_outbox', '004_customer_accounts', '005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font', '010_store_cover', '011_store_identity', '012_store_contact', '013_store_header'];
+const versions = ['001_baseline', '002_legacy_checkout', '003_email_outbox', '004_customer_accounts', '005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font', '010_store_cover', '011_store_identity', '012_store_contact', '013_store_header', '014_platform_billing'];
 async function legacy(query: Query) {
   const columns: Record<string, Record<string, string>> = {
     products: { image_data: 'MEDIUMBLOB NULL', image_mime_type: 'VARCHAR(60) NULL', brand: 'VARCHAR(120) NULL', cost: 'DECIMAL(14,2) NULL', offer_price: 'DECIMAL(14,2) NULL', published: 'TINYINT(1) NOT NULL DEFAULT 1', featured: 'TINYINT(1) NOT NULL DEFAULT 0' },
@@ -170,6 +170,26 @@ export async function runMigrations(sequelize: Sequelize) {
           await query('ALTER TABLE commerces ADD COLUMN header_tagline VARCHAR(180) NULL');
         if (!(await query("SHOW COLUMNS FROM commerces WHERE Field = 'header_display'")).length)
           await query("ALTER TABLE commerces ADD COLUMN header_display VARCHAR(20) NOT NULL DEFAULT 'logo'");
+      }
+      if (version === '014_platform_billing') {
+        await query(`CREATE TABLE IF NOT EXISTS billing_subscriptions (
+          commerce_id CHAR(36) BINARY PRIMARY KEY,
+          mp_subscription_id VARCHAR(100) NULL UNIQUE,
+          status VARCHAR(30) NOT NULL DEFAULT 'pending',
+          payer_email VARCHAR(190) NOT NULL,
+          checkout_url VARCHAR(1200) NULL,
+          amount_ars INT NOT NULL,
+          paid_through DATETIME NULL,
+          started_at DATETIME NULL,
+          created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL,
+          FOREIGN KEY (commerce_id) REFERENCES commerces(id) ON DELETE RESTRICT
+        ) ENGINE=InnoDB`);
+        await query(`CREATE TABLE IF NOT EXISTS billing_payments (
+          id CHAR(36) BINARY PRIMARY KEY, commerce_id CHAR(36) BINARY NOT NULL,
+          mp_payment_id VARCHAR(100) NOT NULL UNIQUE, mp_invoice_id VARCHAR(100) NOT NULL UNIQUE,
+          approved_at DATETIME NOT NULL, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL,
+          FOREIGN KEY (commerce_id) REFERENCES commerces(id) ON DELETE RESTRICT
+        ) ENGINE=InnoDB`);
       }
       // DDL is not transactional in MySQL; every step above is safe to resume.
       await query('INSERT INTO schema_migrations (version, applied_at) VALUES (?, NOW())', [version]);

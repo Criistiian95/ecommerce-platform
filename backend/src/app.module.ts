@@ -3,9 +3,10 @@ import { AppController } from './app.controller';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './auth/auth.module';
 import { CatalogModule } from './catalog/catalog.module';
+import { BillingModule } from './billing/billing.module';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, CatalogModule],
+  imports: [DatabaseModule, AuthModule, CatalogModule, BillingModule],
   controllers: [AppController],
 })
 export class AppModule {}
