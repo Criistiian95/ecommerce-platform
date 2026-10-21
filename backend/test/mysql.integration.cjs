@@ -474,3 +474,32 @@ test('MySQL social settings persist, clear and remain scoped to the owning comme
  await svc.updateSettings(a.commerce.id,{instagramUrl:'',whatsapp:null,accountDisplay:'icon'});
  const cleared=(await pub.getCatalog(a.commerce.slug)).commerce;assert.equal(cleared.instagramUrl,null);assert.equal(cleared.whatsapp,null);assert.equal(cleared.accountDisplay,'icon');assert.equal(cleared.facebookUrl,saved.facebookUrl);
 });
+
+test('MySQL: subscription activates only from approved payment and duplicate invoice is idempotent',async()=>{
+ const {BillingSubscription}=require('../dist/database/models/billing-subscription.model');
+ const {BillingPayment}=require('../dist/database/models/billing-payment.model');
+ const {BillingService}=require('../dist/billing/billing.service');
+ const commerce=await Commerce.create({name:'Pending subscriber',slug:randomUUID(),active:false});
+ const subId='sub-'+randomUUID();
+ await BillingSubscription.create({commerceId:commerce.id,mpSubscriptionId:subId,payerEmail:'merchant@example.com',amountArs:39900,status:'pending'});
+ process.env.MP_SUBSCRIPTIONS_ACCESS_TOKEN='TEST-payment-token';
+ const now=new Date().toISOString();
+ const fakeResponse=(data)=>({ok:true,json:async()=>data});
+ mock.method(global,'fetch',async(url)=>{
+  const path=String(url);
+  if(path.includes('/authorized_payments/')) return fakeResponse({id:123,preapproval_id:subId,external_reference:commerce.id,currency_id:'ARS',transaction_amount:39900,payment:{id:456,status:'approved'}});
+  if(path.includes('/preapproval/')) return fakeResponse({id:subId,status:'authorized',external_reference:commerce.id,payer_email:'merchant@example.com',collector_id:789,auto_recurring:{frequency:1,frequency_type:'months',currency_id:'ARS',transaction_amount:39900}});
+  if(path.includes('/v1/payments/')) return fakeResponse({id:456,status:'approved',currency_id:'ARS',transaction_amount:39900,collector_id:789,date_approved:now});
+  if(path.endsWith('/users/me')) return fakeResponse({id:789});
+  throw Error('Unexpected Mercado Pago URL: '+path);
+ });
+ const service=new BillingService(db);
+ assert.equal((await Commerce.findByPk(commerce.id)).active,false);
+ assert.deepEqual(await service.settleAuthorizedPayment('123'),{processed:true});
+ assert.equal((await Commerce.findByPk(commerce.id)).active,true);
+ assert.equal(await BillingPayment.count({where:{commerceId:commerce.id}}),1);
+ const first=(await BillingSubscription.findByPk(commerce.id)).paidThrough.toISOString();
+ assert.deepEqual(await service.settleAuthorizedPayment('123'),{processed:false});
+ assert.equal(await BillingPayment.count({where:{commerceId:commerce.id}}),1);
+ assert.equal((await BillingSubscription.findByPk(commerce.id)).paidThrough.toISOString(),first);
+});
