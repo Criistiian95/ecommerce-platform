@@ -1,5 +1,5 @@
-import AdminLogoutButton from '../logout-button';
 'use client';
+import AdminLogoutButton from '../logout-button';
 import AdminStoreLink from '../store-link';
 
 import Link from 'next/link';
