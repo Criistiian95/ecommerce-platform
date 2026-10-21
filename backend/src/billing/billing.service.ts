@@ -34,6 +34,29 @@ export class BillingService {
     amountArs:BILLING_MONTHLY_ARS,status:'pending',paidThrough:null,startedAt:null});
   return {checkoutUrl:result.init_point,status:'pending'};
  }
+ async reconcileOverdue() {
+  const {Op}=await import('sequelize');
+  const cutoff=new Date(Date.now()-7*24*60*60*1000);
+  const due=await BillingSubscription.findAll({where:{paidThrough:{[Op.lt]:cutoff}},limit:25,order:[['paidThrough','ASC']]});
+  for(const row of due){
+   if(!row.mpSubscriptionId) continue;
+   try {
+    const params=new URLSearchParams({preapproval_id:row.mpSubscriptionId,limit:'100'});
+    const list=await this.mp('/authorized_payments/search?'+params.toString());
+    if(!Array.isArray(list.results)||!Number.isFinite(Number(list.paging?.total))||
+      Number(list.paging.total)>list.results.length) continue;
+    for(const invoice of list.results){
+     if(invoice.payment?.status==='approved' && invoice.id) await this.settleAuthorizedPayment(String(invoice.id));
+    }
+    await this.db.sequelize.transaction(async transaction=>{
+     const fresh=await BillingSubscription.findByPk(row.commerceId,{transaction,lock:transaction.LOCK.UPDATE});
+     if(!fresh?.paidThrough || fresh.paidThrough>=cutoff) return;
+     await fresh.update({status:'past_due'},{transaction});
+     await Commerce.update({active:false},{where:{id:fresh.commerceId},transaction});
+    });
+   }catch(error){console.error('Billing reconciliation failed for commerce',row.commerceId);}
+  }
+ }
  async subscription(commerceId:string){
   const billing=await BillingSubscription.findByPk(commerceId);
   return billing?{status:billing.status,amountArs:billing.amountArs,paidThrough:billing.paidThrough,checkoutUrl:billing.checkoutUrl}:null;
