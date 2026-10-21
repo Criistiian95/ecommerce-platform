@@ -146,12 +146,16 @@ test('unavailable or nonexistent shops never show a demo catalogue', async ({ pa
   await expect(page.locator('.store-product-card')).toHaveCount(0);
 });
 
-test('storefront remains usable at a mobile viewport without horizontal overflow', async ({ page, context }) => {
-  await mockApi(context);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(shop);
-  await expect(page.getByRole('heading', { name: initialCommerce.heroTitle })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.locator('.store-account-trigger').click();
-  await expect(page.getByRole('link', { name: 'Crear cuenta', exact: true })).toBeVisible();
+test.describe('mobile touch navigation', () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  test('storefront remains usable without horizontal overflow', async ({ page, context }) => {
+    await mockApi(context);
+    await page.goto(shop);
+    await expect(page.getByRole('heading', { name: initialCommerce.heroTitle })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.locator('.store-account-trigger').tap();
+    await expect(page.getByRole('link', { name: 'Crear cuenta', exact: true })).toBeVisible();
+    await page.locator('.store-account-trigger').tap();
+    await expect(page.getByRole('link', { name: 'Crear cuenta', exact: true })).toBeHidden();
+  });
 });
