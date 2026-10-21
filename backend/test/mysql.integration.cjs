@@ -503,3 +503,67 @@ test('MySQL: subscription activates only from approved payment and duplicate inv
  assert.equal(await BillingPayment.count({where:{commerceId:commerce.id}}),1);
  assert.equal((await BillingSubscription.findByPk(commerce.id)).paidThrough.toISOString(),first);
 });
+
+
+test('MySQL: monthly checkout request is scoped to merchant and does not activate store',async()=>{
+ const {BillingSubscription}=require('../dist/database/models/billing-subscription.model');
+ const {BillingService}=require('../dist/billing/billing.service');
+ const commerce=await Commerce.create({name:'Checkout pending',slug:randomUUID(),active:false});
+ process.env.MP_SUBSCRIPTIONS_ACCESS_TOKEN='TEST-simulated-token';
+ process.env.FRONTEND_URL='https://ecommerce-platform-web.onrender.com';
+ process.env.BILLING_WEBHOOK_URL='https://ecommerce-platform-api-2kh1.onrender.com/billing/webhook';
+ const subId='sub-'+randomUUID();
+ const calls=[];
+ mock.method(global,'fetch',async(url,options)=>{
+   calls.push({url:String(url),options});
+   if(String(url).endsWith('/preapproval')) {
+     assert.equal(options.method,'POST');
+     assert.equal(options.headers.Authorization,'Bearer TEST-simulated-token');
+     const body=JSON.parse(options.body);
+     assert.equal(body.external_reference,commerce.id);
+     assert.equal(body.payer_email,'merchant@example.com');
+     assert.equal(body.status,'pending');
+     assert.equal(body.reason,'Diseñolys - Tienda Online');
+     assert.deepEqual(body.auto_recurring,{frequency:1,frequency_type:'months',transaction_amount:39900,currency_id:'ARS'});
+     assert.equal(body.back_url,'https://ecommerce-platform-web.onrender.com/registro/resultado');
+     assert.equal(body.notification_url,process.env.BILLING_WEBHOOK_URL);
+     return {ok:true,json:async()=>({
+       id:subId,init_point:'https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_id='+subId,
+       collector_id:789,external_reference:commerce.id,
+       auto_recurring:{frequency:1,frequency_type:'months',transaction_amount:'39900',currency_id:'ARS'}
+     })};
+   }
+   if(String(url).endsWith('/users/me')) return {ok:true,json:async()=>({id:789})};
+   throw new Error('Unexpected MP path: '+url);
+ });
+ const svc=new BillingService(db);
+ const checkout=await svc.createMerchantSubscription(commerce.id,'merchant@example.com');
+ assert.equal(checkout.status,'pending');
+ assert.match(checkout.checkoutUrl,/^https:\/\/www\.mercadopago\.com\.ar\/subscriptions\/checkout/);
+ const stored=await BillingSubscription.findByPk(commerce.id);
+ assert.equal(stored.amountArs,39900);
+ assert.equal(stored.mpSubscriptionId,subId);
+ assert.equal(stored.status,'pending');
+ assert.equal(stored.paidThrough,null);
+ assert.equal((await Commerce.findByPk(commerce.id)).active,false);
+ const repeat=await svc.createMerchantSubscription(commerce.id,'merchant@example.com');
+ assert.deepEqual(repeat,checkout);
+ assert.equal(calls.filter(call=>call.options?.method==='POST').length,1);
+});
+
+test('MySQL: checkout rejects wrong Mercado Pago collector and keeps commerce inactive',async()=>{
+ const {BillingSubscription}=require('../dist/database/models/billing-subscription.model');
+ const {BillingService}=require('../dist/billing/billing.service');
+ const commerce=await Commerce.create({name:'Wrong collector',slug:randomUUID(),active:false});
+ process.env.MP_SUBSCRIPTIONS_ACCESS_TOKEN='TEST-simulated-token';
+ process.env.FRONTEND_URL='https://ecommerce-platform-web.onrender.com';
+ process.env.BILLING_WEBHOOK_URL='https://ecommerce-platform-api-2kh1.onrender.com/billing/webhook';
+ mock.method(global,'fetch',async(url)=>{
+  if(String(url).endsWith('/preapproval')) return {ok:true,json:async()=>({id:'sub-other',collector_id:100,init_point:'https://www.mercadopago.com.ar/subscriptions/checkout',external_reference:commerce.id,auto_recurring:{transaction_amount:39900}})};
+  if(String(url).endsWith('/users/me')) return {ok:true,json:async()=>({id:789})};
+  throw Error('Unexpected Mercado Pago URL');
+ });
+ await assert.rejects(new BillingService(db).createMerchantSubscription(commerce.id,'merchant@example.com'),/cuenta receptora/);
+ assert.equal((await Commerce.findByPk(commerce.id)).active,false);
+ assert.equal(await BillingSubscription.count({where:{commerceId:commerce.id}}),0);
+});
