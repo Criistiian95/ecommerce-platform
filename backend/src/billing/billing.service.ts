@@ -42,7 +42,7 @@ export class BillingService {
   if(!/^[a-z0-9-]{5,100}$/i.test(mpId)) throw new BadRequestException('ID inválido');
   const remote=await this.mp('/preapproval/'+encodeURIComponent(mpId));
   const billing=await BillingSubscription.findOne({where:{mpSubscriptionId:mpId}});
-  if(!billing || String(remote.id)!==mpId || remote.status!=='authorized' || remote.payer_email?.toLowerCase()!==billing.payerEmail.toLowerCase() ||
+  if(!billing || String(remote.id)!==mpId || String(remote.external_reference)!==billing.commerceId || remote.status!=='authorized' || remote.payer_email?.toLowerCase()!==billing.payerEmail.toLowerCase() ||
      remote.auto_recurring?.currency_id!=='ARS' || Number(remote.auto_recurring?.transaction_amount)!==billing.amountArs ||
      remote.auto_recurring?.frequency!==1 || remote.auto_recurring?.frequency_type!=='months') return {verified:false};
   // Authorization alone does not prove a successful debit: activation is exclusively tied to verified payment.
@@ -56,16 +56,18 @@ export class BillingService {
   const sub=await BillingSubscription.findOne({where:{mpSubscriptionId:subId}});
   if(!sub) return {processed:false};
   const subscription=await this.mp('/preapproval/'+encodeURIComponent(subId));
-  if(subscription.status!=='authorized' || subscription.payer_email?.toLowerCase()!==sub.payerEmail.toLowerCase() ||
+  if(subscription.status!=='authorized' || String(subscription.external_reference)!==sub.commerceId || subscription.payer_email?.toLowerCase()!==sub.payerEmail.toLowerCase() ||
      subscription.auto_recurring?.currency_id!=='ARS'||Number(subscription.auto_recurring?.transaction_amount)!==BILLING_MONTHLY_ARS ||
      subscription.auto_recurring?.frequency!==1 || subscription.auto_recurring?.frequency_type!=='months') return {processed:false};
   // Subscription authorization and authorized-payment authorization are different states.
+  if(String(invoice.external_reference)!==sub.commerceId || invoice.currency_id!=='ARS' || Number(invoice.transaction_amount)!==BILLING_MONTHLY_ARS || invoice.payment?.status!=='approved') return {processed:false};
   const paymentId=String(invoice.payment?.id||invoice.payment_id||'');
   if(!/^\d+$/.test(paymentId)) return {processed:false};
   const payment=await this.mp('/v1/payments/'+paymentId);
   if(payment.status!=='approved'||payment.currency_id!=='ARS'||Number(payment.transaction_amount)!==BILLING_MONTHLY_ARS ||
      String(payment.id)!==paymentId || String(payment.external_reference||'')!==String(invoice.external_reference||'') && !!invoice.external_reference) return {processed:false};
   const owner=await this.mp('/users/me');
+  if(String(subscription.collector_id)!==String(owner.id)) return {processed:false};
   if(String(payment.collector_id)!==String(owner.id)) return {processed:false};
   const approved=new Date(payment.date_approved||0);
   if(!Number.isFinite(approved.getTime())||approved>new Date()) return {processed:false};
