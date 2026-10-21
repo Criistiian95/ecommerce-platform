@@ -1,5 +1,5 @@
-import AdminLogoutButton from '../logout-button';
 'use client';
+import AdminLogoutButton from '../logout-button';
 import Link from 'next/link';
 import { transparentLogo } from '../../logo-background';
 import { coverGroups, storeCovers, storeCover, type CoverGroup } from '../../store-covers';
