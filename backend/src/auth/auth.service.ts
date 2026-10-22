@@ -56,7 +56,9 @@ export class AuthService {
 
   async login(email: string, password: string, commerceSlug?: string) {
     const slug = commerceSlug?.trim().toLowerCase();
-    const commerce = slug ? await Commerce.findOne({ where: { slug, active: true }, attributes: ['id'] }) : null;
+    // Pending stores must be discoverable so their authenticated owner can resume
+    // checkout. The active-store check below still runs before any session is issued.
+    const commerce = slug ? await Commerce.findOne({ where: { slug }, attributes: ['id'] }) : null;
     if (slug && !commerce) throw new UnauthorizedException('Credenciales inválidas');
     const users = await User.findAll({
       where: {
@@ -354,3 +356,4 @@ export class AuthService {
     };
   }
 }
+
