@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import styles from './home.module.css';
+import PlatformWhatsApp from './platform-whatsapp';
 
 export default function HomePage() {
   return <main className={styles.page}>
@@ -58,5 +59,6 @@ export default function HomePage() {
       <Link className={styles.button} href="/contacto">Solicitá información →</Link>
     </section>
     <footer className={styles.foot}>© {new Date().getFullYear()} Diseñolys · Tu tienda online, con tu identidad. · <Link href="/demo">Demostración</Link> · <Link href="/login">Acceso para comercios</Link></footer>
+    <PlatformWhatsApp floating />
   </main>;
 }

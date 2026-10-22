@@ -567,3 +567,48 @@ test('MySQL: checkout rejects wrong Mercado Pago collector and keeps commerce in
  assert.equal((await Commerce.findByPk(commerce.id)).active,false);
  assert.equal(await BillingSubscription.count({where:{commerceId:commerce.id}}),0);
 });
+
+test('MySQL: pending owner resumes checkout by store slug without receiving an admin session',async()=>{
+ const {AuthService}=require('../dist/auth/auth.service');
+ const {BillingService}=require('../dist/billing/billing.service');
+ const {BillingSubscription}=require('../dist/database/models/billing-subscription.model');
+ const {Session}=require('../dist/database/models/session.model');
+ const bcrypt=require('bcryptjs');
+ const previousFlag=process.env.BILLING_ENABLED;
+ process.env.BILLING_ENABLED='true';
+ try {
+  const commerce=await Commerce.create({name:'Resume pending payment',slug:randomUUID(),active:false});
+  const email=`${randomUUID()}@example.com`, password='pending-owner-test-password';
+  const owner=await User.create({commerceId:commerce.id,email,name:'Owner',role:'admin',active:true,passwordHash:await bcrypt.hash(password,4)});
+  const checkoutUrl='https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_id=sub-'+randomUUID();
+  await BillingSubscription.create({commerceId:commerce.id,payerEmail:email,mpSubscriptionId:'sub-'+randomUUID(),checkoutUrl,amountArs:39900,status:'pending'});
+  mock.method(global,'fetch',async()=>{throw Error('Resuming stored checkout must not create another subscription');});
+  const auth=new AuthService(db,new BillingService(db));
+
+  const result=await auth.login(email,password,commerce.slug);
+  assert.equal(result.billingRequired,true);
+  assert.equal(result.commerceSlug,commerce.slug);
+  assert.equal(result.checkoutUrl,checkoutUrl);
+  assert.equal(result.token,undefined);
+  assert.equal(await Session.count({where:{userId:owner.id}}),0);
+  assert.equal((await commerce.reload()).active,false);
+  assert.equal(await BillingSubscription.count({where:{commerceId:commerce.id}}),1);
+
+  await assert.rejects(auth.login(email,'incorrect-password',commerce.slug),/Credenciales inválidas/);
+  const other=await Commerce.create({name:'Other store',slug:randomUUID(),active:true});
+  await assert.rejects(auth.login(email,password,other.slug),/Credenciales inválidas/);
+  await assert.rejects(auth.login(email,password,randomUUID()),/Credenciales inválidas/);
+
+  await owner.update({role:'operator'});
+  await assert.rejects(auth.login(email,password,commerce.slug),/pendiente de pago/);
+  await owner.update({role:'admin'});
+  process.env.BILLING_ENABLED='false';
+  await assert.rejects(auth.login(email,password,commerce.slug),/deshabilitada/);
+  assert.equal(await Session.count({where:{userId:owner.id}}),0);
+  assert.equal((await commerce.reload()).active,false);
+ } finally {
+  if(previousFlag===undefined) delete process.env.BILLING_ENABLED;
+  else process.env.BILLING_ENABLED=previousFlag;
+ }
+});
+
