@@ -544,11 +544,12 @@ test('MySQL: monthly checkout request is scoped to merchant and does not activat
      assert.equal(body.notification_url,process.env.BILLING_WEBHOOK_URL);
      return {ok:true,json:async()=>({
        id:subId,init_point:'https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_id='+subId,
-       collector_id:789,external_reference:commerce.id,
+       collector_id:789,external_reference:commerce.id,payer_email:'merchant@example.com',status:'pending',
        auto_recurring:{frequency:1,frequency_type:'months',transaction_amount:'39900',currency_id:'ARS'}
      })};
    }
    if(String(url).endsWith('/users/me')) return {ok:true,json:async()=>({id:789})};
+   if(String(url).endsWith('/preapproval/'+subId)) return {ok:true,json:async()=>({id:subId,status:'pending',collector_id:789,external_reference:commerce.id,payer_email:'merchant@example.com',init_point:'https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_id='+subId,auto_recurring:{frequency:1,frequency_type:'months',transaction_amount:39900,currency_id:'ARS'}})};
    throw new Error('Unexpected MP path: '+url);
  });
  const svc=new BillingService(db);
@@ -580,7 +581,8 @@ test('MySQL: checkout rejects wrong Mercado Pago collector and keeps commerce in
  });
  await assert.rejects(new BillingService(db).createMerchantSubscription(commerce.id,'merchant@example.com'),/cuenta receptora/);
  assert.equal((await Commerce.findByPk(commerce.id)).active,false);
- assert.equal(await BillingSubscription.count({where:{commerceId:commerce.id}}),0);
+ const failed=await BillingSubscription.findByPk(commerce.id);
+ assert.equal(failed.status,'creating'); assert.equal(failed.mpSubscriptionId,null);
 });
 
 test('MySQL: pending owner resumes checkout by store slug without receiving an admin session',async()=>{
@@ -595,9 +597,17 @@ test('MySQL: pending owner resumes checkout by store slug without receiving an a
   const commerce=await Commerce.create({name:'Resume pending payment',slug:randomUUID(),active:false});
   const email=`${randomUUID()}@example.com`, password='pending-owner-test-password';
   const owner=await User.create({commerceId:commerce.id,email,name:'Owner',role:'admin',active:true,passwordHash:await bcrypt.hash(password,4)});
-  const checkoutUrl='https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_id=sub-'+randomUUID();
-  await BillingSubscription.create({commerceId:commerce.id,payerEmail:email,mpSubscriptionId:'sub-'+randomUUID(),checkoutUrl,amountArs:39900,status:'pending'});
-  mock.method(global,'fetch',async()=>{throw Error('Resuming stored checkout must not create another subscription');});
+  const pendingId='sub-'+randomUUID();
+  const checkoutUrl='https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_id='+pendingId;
+  await BillingSubscription.create({commerceId:commerce.id,payerEmail:email,mpSubscriptionId:pendingId,checkoutUrl,amountArs:39900,status:'pending'});
+  process.env.MP_SUBSCRIPTIONS_ACCESS_TOKEN='TEST-simulated-token';
+  const stored=await BillingSubscription.findByPk(commerce.id);
+  mock.method(global,'fetch',async(url,options)=>{
+   assert.notEqual(options.method,'POST');
+   if(String(url).endsWith('/users/me')) return {ok:true,json:async()=>({id:789})};
+   if(String(url).endsWith('/preapproval/'+stored.mpSubscriptionId)) return {ok:true,json:async()=>({id:stored.mpSubscriptionId,status:'pending',collector_id:789,external_reference:commerce.id,payer_email:email,init_point:checkoutUrl,auto_recurring:{frequency:1,frequency_type:'months',transaction_amount:39900,currency_id:'ARS'}})};
+   throw Error('Unexpected read');
+  });
   const auth=new AuthService(db,new BillingService(db));
 
   const result=await auth.login(email,password,commerce.slug);
@@ -627,3 +637,35 @@ test('MySQL: pending owner resumes checkout by store slug without receiving an a
  }
 });
 
+
+
+test('MySQL: parallel self-service requests create at most one subscription and never change legacy store access',async()=>{
+ const {BillingService}=require('../dist/billing/billing.service');
+ const {BillingSubscription}=require('../dist/database/models/billing-subscription.model');
+ const a=await fixture(), b=await fixture();
+ process.env.BILLING_ENABLED='true'; process.env.MP_SUBSCRIPTIONS_ACCESS_TOKEN='TEST-simulated-token';
+ process.env.FRONTEND_URL='https://disenolys.store'; process.env.BILLING_WEBHOOK_URL='https://ecommerce-platform-api-2kh1.onrender.com/billing/webhook';
+ let posts=0, remote=null;
+ const remoteSub={id:'sub-'+randomUUID(),status:'pending',collector_id:789,external_reference:a.commerce.id,payer_email:a.user.email,
+   init_point:'https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_id=test',auto_recurring:{frequency:1,frequency_type:'months',transaction_amount:39900,currency_id:'ARS'}};
+ remoteSub.init_point='https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_id='+remoteSub.id;
+ mock.method(global,'fetch',async(url,options)=>{
+  const path=String(url), response=data=>({ok:true,json:async()=>data});
+  if(path.endsWith('/users/me')) return response({id:789});
+  if(options.method==='POST') { posts++; assert.equal(JSON.parse(options.body).back_url,'https://disenolys.store/admin/plan?pago=pendiente'); await new Promise(resolve=>setTimeout(resolve,50)); remote=remoteSub; return response(remote); }
+  if(path.includes('/preapproval/search?')) return response({paging:{total:remote?1:0},results:remote?[remote]:[]});
+  if(path.endsWith('/preapproval/'+remoteSub.id)) return response(remoteSub);
+  throw Error('Unexpected read');
+ });
+ const svc=new BillingService(db);
+ await assert.rejects(svc.preparePlanCheckout(a.commerce.id,b.user.id,true,39900),/Administrador inválido/);
+ const results=await Promise.allSettled([svc.preparePlanCheckout(a.commerce.id,a.user.id,true,39900),svc.preparePlanCheckout(a.commerce.id,a.user.id,true,39900)]);
+ assert.ok(results.some(r=>r.status==='fulfilled')); assert.equal(posts,1);
+ const again=await svc.preparePlanCheckout(a.commerce.id,a.user.id,true,39900);
+ assert.equal(again.checkoutUrl,remoteSub.init_point); assert.equal(posts,1);
+ const stored=await BillingSubscription.findByPk(a.commerce.id);
+ assert.equal(stored.paidThrough,null); assert.equal(stored.status,'pending');
+ assert.equal(await BillingSubscription.count({where:{commerceId:a.commerce.id}}),1);
+ assert.equal(await BillingSubscription.findByPk(b.commerce.id),null);
+ assert.equal((await a.commerce.reload()).active,true);
+});

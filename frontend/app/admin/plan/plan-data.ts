@@ -2,6 +2,7 @@ export type PlanPayment = { id: string; paymentReference: string; approvedAt: st
 export type MerchantPlan = {
   commerce: { id: string; name: string; slug: string; active: boolean };
   billingEnabled: boolean;
+  paymentAction: { kind: 'start' | 'resume' | 'none'; amountArs: number };
   subscription: null | {
     status: string; amountArs: number; currency: string; interval: string;
     paidThrough: string | null; startedAt: string | null; checkoutUrl: string | null;
@@ -25,7 +26,7 @@ export function planPresentation(data: MerchantPlan, now = Date.now()) {
   const sub = data.subscription;
   if (!sub) return {
     label: 'Sin suscripción asociada', tone: 'neutral', daysLeft: null,
-    message: 'Esta tienda no tiene un abono automático asociado. Consultanos para revisar su modalidad de acceso. Visitar esta sección no inicia ningún cobro.',
+    message: 'Podés iniciar tu abono desde la tarjeta Pagar cuota. El importe corresponde a la primera cuota; no se te agrega deuda por períodos anteriores.',
   };
   const paidUntil = sub.paidThrough ? Date.parse(sub.paidThrough) : NaN;
   const daysLeft = Number.isFinite(paidUntil) ? Math.max(0, Math.ceil((paidUntil - now) / 86400000)) : null;
@@ -42,10 +43,36 @@ export function planPresentation(data: MerchantPlan, now = Date.now()) {
     tone: daysLeft !== null && daysLeft <= 7 ? 'warning' : 'success', daysLeft,
     message: 'Tu período abonado está vigente. La renovación queda confirmada cuando se acredita el siguiente pago.',
   };
-  if (sub.status === 'pending') return {
+  if (sub.status === 'authorized') return {
+    label: 'Esperando acreditación', tone: 'neutral', daysLeft,
+    message: 'Mercado Pago ya recibió la autorización. Usá Verificar pago para consultar si se acreditó la cuota.',
+  };
+  if (sub.status === 'creating') return {
+    label: 'Preparando pago', tone: 'neutral', daysLeft,
+    message: 'Estamos confirmando el enlace de tu suscripción. Podés reintentar desde Pagar cuota sin generar otra suscripción.',
+  };
+  if (sub.status === 'pending' || sub.status === 'checkout_failed') return {
     label: 'Pago pendiente', tone: 'warning', daysLeft,
     message: 'La suscripción está pendiente de un pago acreditado. La autorización de Mercado Pago por sí sola no confirma el cobro.',
   };
   return { label: 'Estado por revisar', tone: 'neutral', daysLeft,
     message: 'No hay información suficiente para confirmar un período abonado vigente. Contactanos para revisar tu suscripción.' };
+}
+
+export function paymentOffer(data: MerchantPlan) {
+  const action = data.paymentAction;
+  if (!data.billingEnabled || !action || !['start', 'resume'].includes(action.kind) ||
+      !Number.isSafeInteger(action.amountArs) || action.amountArs <= 0 || data.lastPayment || data.subscription?.paidThrough) return null;
+  return { amountArs: action.amountArs, firstPayment: action.kind === 'start' };
+}
+
+export function validatedCheckoutUrl(value: unknown) {
+  if (typeof value !== 'string') return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol === 'https:' && !url.username && !url.password &&
+        ['mercadopago.com.ar', 'www.mercadopago.com.ar'].includes(url.hostname) &&
+        url.pathname === '/subscriptions/checkout') return url.toString();
+  } catch { /* Do not navigate to an invalid response URL. */ }
+  return null;
 }

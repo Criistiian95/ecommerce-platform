@@ -1,10 +1,11 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { API_URL } from '../../storefront-types';
 import { ADMIN_TOKEN_KEY } from '../session';
 import type { MerchantPlan } from './plan-data';
 
 export function useMerchantPlan(page = 1) {
+  const lastPage = useRef(page);
   const [revision, setRevision] = useState(0);
   const [result, setResult] = useState<{ data: MerchantPlan | null; loading: boolean; error: string; unauthorized: boolean }>({
     data: null, loading: true, error: '', unauthorized: false,
@@ -12,7 +13,9 @@ export function useMerchantPlan(page = 1) {
   useEffect(() => {
     const token = localStorage.getItem(ADMIN_TOKEN_KEY);
     const controller = new AbortController();
-    setResult({ data: null, loading: true, error: '', unauthorized: false });
+    const samePage = lastPage.current === page;
+    lastPage.current = page;
+    setResult(previous => ({ data: samePage ? previous.data : null, loading: true, error: '', unauthorized: false }));
     if (!token) {
       setResult({ data: null, loading: false, error: 'Iniciá sesión para consultar el plan de tu tienda.', unauthorized: true });
       return () => controller.abort();

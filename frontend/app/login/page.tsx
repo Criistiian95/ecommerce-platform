@@ -48,7 +48,7 @@ export default function LoginPage() {
           navigating = true;
           return;
         }
-        setMessage('Tu tienda está pendiente de pago. Reintentá en unos minutos.');
+        setMessage(data.message || 'Tu tienda está pendiente de pago. Reintentá en unos minutos.');
         return;
       }
       if (!data.token) {
