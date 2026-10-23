@@ -24,10 +24,12 @@ import { AdminDashboardService } from './admin-dashboard.service';
 import { AdminCommerceSettingsService } from './admin-commerce-settings.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
+import { AdminPlanController } from './admin-plan.controller';
+import { AdminPlanService } from './admin-plan.service';
 
 @Module({
   imports: [AuthModule],
-  controllers: [MpConnectionController, CatalogController, CatalogPublicController, AdminOrdersController, AdminCustomersController, CustomerAccountController, AdminDashboardController, AdminCommerceSettingsController],
-  providers: [MpConnectionService, OrderEmailWorker, ReservationWorker, CatalogService, PublicCatalogService, PublicCartService, PublicCheckoutService, OrderEmailService, MercadoPagoService, AdminOrdersService, AdminCustomersService, CustomerAccountService, AdminDashboardService, AdminCommerceSettingsService, AuthGuard, RolesGuard],
+  controllers: [MpConnectionController, CatalogController, CatalogPublicController, AdminOrdersController, AdminCustomersController, CustomerAccountController, AdminDashboardController, AdminCommerceSettingsController, AdminPlanController],
+  providers: [MpConnectionService, OrderEmailWorker, ReservationWorker, CatalogService, PublicCatalogService, PublicCartService, PublicCheckoutService, OrderEmailService, MercadoPagoService, AdminOrdersService, AdminCustomersService, CustomerAccountService, AdminDashboardService, AdminCommerceSettingsService, AdminPlanService, AuthGuard, RolesGuard],
 })
 export class CatalogModule {}

@@ -1,6 +1,7 @@
 'use client';
 import AdminLogoutButton from '../logout-button';
 import AdminStoreLink from '../store-link';
+import PlanSummary from '../plan/plan-summary';
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
@@ -119,6 +120,7 @@ export default function AdminDashboardPage(){
           <Link className="admin-nav-link" href="/admin">Productos</Link>
           <Link className="admin-nav-link" href="/admin/pedidos">Pedidos</Link>
           <Link className="admin-nav-link" href="/admin/clientes">Clientes</Link>
+          <Link className="admin-nav-link" href="/admin/plan">Mi plan</Link>
           <Link className="admin-nav-link" href="/admin/configuracion">Configuración</Link>
           <Link className="admin-nav-link" href="/admin/personalizar">Personalizar mi tienda</Link>
           <AdminStoreLink />
@@ -148,6 +150,8 @@ export default function AdminDashboardPage(){
       </section>
 
       {error && <div className="dashboard-alert">{error}<button onClick={()=>void load()}>Reintentar</button></div>}
+
+      <PlanSummary />
 
       <section className="dashboard-metrics">
         <article className="dashboard-metric-card">

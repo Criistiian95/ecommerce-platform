@@ -198,6 +198,7 @@ export default function AdminOrdersPage() {
           <Link className="admin-nav-link" href="/admin">Productos</Link>
           <Link className="admin-nav-link active" href="/admin/pedidos">Pedidos</Link>
           <Link className="admin-nav-link" href="/admin/clientes">Clientes</Link>
+          <Link className="admin-nav-link" href="/admin/plan">Mi plan</Link>
           <Link className="admin-nav-link" href="/admin/configuracion">Configuración</Link>
           <Link className="admin-nav-link" href="/admin/personalizar">Personalizar mi tienda</Link>
           <AdminStoreLink />

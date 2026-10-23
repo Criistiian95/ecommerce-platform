@@ -310,6 +310,7 @@ export default function AdminPage() {
           <a className="admin-nav-link active" href="/admin">Productos</a>
           <a className="admin-nav-link" href="/admin/pedidos">Pedidos</a>
           <a className="admin-nav-link" href="/admin/clientes">Clientes</a>
+          <Link className="admin-nav-link" href="/admin/plan">Mi plan</Link>
           <a className="admin-nav-link" href="/admin/configuracion">Configuración</a>
           <Link className="admin-nav-link" href="/admin/personalizar">Personalizar mi tienda</Link>
           <AdminStoreLink />
