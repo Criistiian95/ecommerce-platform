@@ -110,3 +110,17 @@ test('a definitive provider rejection can retry, while preserving a single check
  assert.equal((await service.preparePlanCheckout('store-a','owner-a',true,39900)).checkoutUrl,remote.init_point);
  assert.equal(posts,2); assert.equal(state.row.status,'pending');
 });
+
+for (const payer_email of [undefined, null, '']) {
+ test('provider preapproval can omit payer email without blocking its verified checkout: '+String(payer_email), async()=>{
+  const {service,state}=fixture({remote:{payer_email}});
+  assert.equal((await service.preparePlanCheckout('store-a','owner-a',true,39900)).status,'pending');
+  assert.equal(state.posts,1); assert.equal(state.row.paidThrough,null);
+ });
+}
+test('recover a persisted intent when Mercado Pago omits payer email',async()=>{
+ const {service,state}=fixture({timeout:true,remote:{payer_email:undefined}});
+ await assert.rejects(service.preparePlanCheckout('store-a','owner-a',true,39900));
+ assert.equal((await service.preparePlanCheckout('store-a','owner-a',true,39900)).status,'pending');
+ assert.equal(state.posts,1);
+});

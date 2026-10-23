@@ -1,7 +1,5 @@
 'use client';
-import AdminLogoutButton from './logout-button';
-import Link from 'next/link';
-import AdminStoreLink from './store-link';
+import AdminNavigation from './navigation';
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -304,17 +302,7 @@ export default function AdminPage() {
           <div className="brand">Panel del comercio</div>
           <small>Productos, categorías y stock</small>
         </div>
-        <nav className="admin-nav" aria-label="Navegación del panel">
-          <AdminLogoutButton />
-          <a className="admin-nav-link" href="/admin/dashboard">Dashboard</a>
-          <a className="admin-nav-link active" href="/admin">Productos</a>
-          <a className="admin-nav-link" href="/admin/pedidos">Pedidos</a>
-          <a className="admin-nav-link" href="/admin/clientes">Clientes</a>
-          <Link className="admin-nav-link" href="/admin/plan">Mi plan</Link>
-          <a className="admin-nav-link" href="/admin/configuracion">Configuración</a>
-          <Link className="admin-nav-link" href="/admin/personalizar">Personalizar mi tienda</Link>
-          <AdminStoreLink />
-        </nav>
+        <AdminNavigation />
       </header>
 
       {toast && (

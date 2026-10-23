@@ -503,7 +503,7 @@ test('MySQL: subscription activates only from approved payment and duplicate inv
  mock.method(global,'fetch',async(url)=>{
   const path=String(url);
   if(path.includes('/authorized_payments/')) return fakeResponse({id:123,preapproval_id:subId,external_reference:commerce.id,currency_id:'ARS',transaction_amount:39900,payment:{id:456,status:'approved'}});
-  if(path.includes('/preapproval/')) return fakeResponse({id:subId,status:'authorized',external_reference:commerce.id,payer_email:'merchant@example.com',collector_id:789,auto_recurring:{frequency:1,frequency_type:'months',currency_id:'ARS',transaction_amount:39900}});
+  if(path.includes('/preapproval/')) return fakeResponse({id:subId,status:'authorized',external_reference:commerce.id,collector_id:789,auto_recurring:{frequency:1,frequency_type:'months',currency_id:'ARS',transaction_amount:39900}});
   if(path.includes('/v1/payments/')) return fakeResponse({id:456,status:'approved',currency_id:'ARS',transaction_amount:39900,collector_id:789,date_approved:now});
   if(path.endsWith('/users/me')) return fakeResponse({id:789});
   throw Error('Unexpected Mercado Pago URL: '+path);

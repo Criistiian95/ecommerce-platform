@@ -10,3 +10,13 @@ export function safeSubscriptionCheckout(value: unknown, subscriptionId?: string
   } catch { /* Invalid provider response. */ }
   return null;
 }
+
+/** Mercado Pago may omit payer_email in a preapproval response (including its documented examples).
+ * Correlation still requires the exact subscription ID, merchant reference and verified collector.
+ * An explicit, non-empty conflicting email remains a mismatch.
+ */
+export function subscriptionEmailMatches(value: unknown, expected: string): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value !== 'string') return false;
+  return !value.trim() || value.trim().toLowerCase() === expected.trim().toLowerCase();
+}
