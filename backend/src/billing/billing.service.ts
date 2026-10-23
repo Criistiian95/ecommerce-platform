@@ -1,9 +1,11 @@
-import {BadRequestException,Injectable,ServiceUnavailableException} from '@nestjs/common';
+import {BadRequestException,ConflictException,Injectable,ServiceUnavailableException} from '@nestjs/common';
 import {Commerce} from '../database/models/commerce.model';
 import {BillingSubscription} from '../database/models/billing-subscription.model';
 import {BillingPayment} from '../database/models/billing-payment.model';
 import {BILLING_MONTHLY_ARS,nextPaidThrough} from './billing-rules';
 import {DatabaseService} from '../database/database.service';
+import {User} from '../database/models/user.model';
+import {safeSubscriptionCheckout} from './checkout-policy';
 
 @Injectable()
 export class BillingService {
@@ -12,30 +14,104 @@ export class BillingService {
  private async mp(path:string,options:RequestInit={}):Promise<any> {
   const res=await fetch('https://api.mercadopago.com'+path,{...options,signal:AbortSignal.timeout(15000),headers:{Authorization:'Bearer '+this.token(),Accept:'application/json',...options.headers}});
   const data=await res.json().catch(()=>null);
-  if(!res.ok) throw new ServiceUnavailableException('No se pudo verificar la suscripción con Mercado Pago');
+  if(!res.ok) {
+   const error=new ServiceUnavailableException('No se pudo verificar la suscripción con Mercado Pago');
+   if([400,401,403,422].includes(res.status)) (error as any).definitiveRejection=true;
+   throw error;
+  }
   return data;
  }
  async createMerchantSubscription(commerceId:string,payerEmail:string) {
-  const commerce=await Commerce.findByPk(commerceId);
-  if(!commerce || commerce.active) throw new BadRequestException('Comercio no elegible para el alta');
-  const current=await BillingSubscription.findByPk(commerceId);
-  if(current?.checkoutUrl && current.mpSubscriptionId) return {checkoutUrl:current.checkoutUrl,status:current.status};
-  if(current?.mpSubscriptionId) throw new ServiceUnavailableException('La suscripción requiere revisión');
-  const url=(process.env.FRONTEND_URL||'').replace(/\/$/,'');
-  if(!url.startsWith('https://')) throw new ServiceUnavailableException('FRONTEND_URL debe ser HTTPS');
-  if(!/^https:\/\/[^\s/]+\/billing\/webhook$/.test((process.env.BILLING_WEBHOOK_URL||'').trim())) throw new ServiceUnavailableException('BILLING_WEBHOOK_URL inválida o sin configurar');
-  const body={reason:'Diseñolys - Tienda Online',external_reference:commerce.id,payer_email:payerEmail,
-   auto_recurring:{frequency:1,frequency_type:'months',transaction_amount:BILLING_MONTHLY_ARS,currency_id:'ARS'},
-   back_url:url+'/registro/resultado',notification_url:(process.env.BILLING_WEBHOOK_URL||'').trim(),status:'pending'};
-  const result=await this.mp('/preapproval',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  const owner=await this.mp('/users/me');
-  if(String(result.collector_id)!==String(owner.id)) throw new ServiceUnavailableException('La suscripción apunta a otra cuenta receptora');
-  if(!result.id||!result.init_point||!/^https:\/\//.test(result.init_point)||
-    String(result.external_reference)!==commerce.id||Number(result.auto_recurring?.transaction_amount)!==BILLING_MONTHLY_ARS)
+  return this.prepareSubscription(commerceId,payerEmail,false);
+ }
+ async preparePlanCheckout(commerceId:string|null,userId:string,acceptedMonthly:boolean,amountArs:number) {
+  if(!commerceId) throw new BadRequestException('La sesión no tiene un comercio asociado');
+  if(process.env.BILLING_ENABLED!=='true') throw new ServiceUnavailableException('El pago del abono no está disponible por el momento');
+  if(acceptedMonthly!==true || amountArs!==BILLING_MONTHLY_ARS) throw new BadRequestException('Confirmá el abono mensual de $39.900 antes de continuar');
+  const user=await User.findOne({where:{id:userId,commerceId,active:true}});
+  if(!user || !['admin','superadmin'].includes(user.role)) throw new BadRequestException('Administrador inválido para esta tienda');
+  return this.prepareSubscription(commerceId,user.email,true);
+ }
+ private validateSubscription(remote:any,row:{commerceId:string;payerEmail:string},collectorId:string) {
+  if(!remote?.id || String(remote.collector_id)!==collectorId) throw new ServiceUnavailableException('La suscripción apunta a otra cuenta receptora');
+  if(String(remote.external_reference)!==row.commerceId || remote.payer_email?.toLowerCase()!==row.payerEmail.toLowerCase() ||
+    remote.auto_recurring?.currency_id!=='ARS' || Number(remote.auto_recurring?.transaction_amount)!==BILLING_MONTHLY_ARS ||
+    remote.auto_recurring?.frequency!==1 || remote.auto_recurring?.frequency_type!=='months')
     throw new ServiceUnavailableException('La respuesta de Mercado Pago requiere revisión');
-  await BillingSubscription.create({commerceId,payerEmail,mpSubscriptionId:String(result.id),checkoutUrl:result.init_point,
-    amountArs:BILLING_MONTHLY_ARS,status:'pending',paidThrough:null,startedAt:null});
-  return {checkoutUrl:result.init_point,status:'pending'};
+ }
+ private async prepareSubscription(commerceId:string,payerEmail:string,fromPlan:boolean) {
+  const front=(process.env.FRONTEND_URL||'').replace(/\/$/,'');
+  const webhook=(process.env.BILLING_WEBHOOK_URL||'').trim();
+  if(!/^https:\/\/[^\s]+$/.test(front)) throw new ServiceUnavailableException('FRONTEND_URL debe ser HTTPS');
+  if(!/^https:\/\/[^\s/]+\/billing\/webhook$/.test(webhook)) throw new ServiceUnavailableException('BILLING_WEBHOOK_URL inválida o sin configurar');
+  const owner=await this.mp('/users/me');
+  if(!owner?.id) throw new ServiceUnavailableException('No se pudo verificar la cuenta receptora');
+  // Persist intent BEFORE the remote POST. A timeout or a restart must not cause a second subscription.
+  const reservation=await this.db.sequelize.transaction(async transaction=>{
+   const commerce=await Commerce.findByPk(commerceId,{transaction,lock:transaction.LOCK.UPDATE});
+   if(!commerce || (!fromPlan && commerce.active)) throw new BadRequestException('Comercio no elegible para el alta');
+   const current=await BillingSubscription.findByPk(commerceId,{transaction,lock:transaction.LOCK.UPDATE});
+   if(current?.mpSubscriptionId) return {row:current,create:false};
+   if(current?.paidThrough || await BillingPayment.findOne({where:{commerceId},transaction}))
+     throw new ConflictException('Esta tienda ya tiene pagos registrados; no se generará otra suscripción');
+   if(current) {
+    if(current.status==='checkout_failed') { await current.update({status:'creating'},{transaction}); return {row:current,create:true}; }
+    return {row:current,create:false};
+   }
+   const row=await BillingSubscription.create({commerceId,payerEmail,amountArs:BILLING_MONTHLY_ARS,
+    status:'creating',mpSubscriptionId:null,checkoutUrl:null,paidThrough:null,startedAt:null},{transaction});
+   return {row,create:true};
+  });
+  const row=reservation.row;
+  let remote:any;
+  if(row.mpSubscriptionId) {
+   remote=await this.mp('/preapproval/'+encodeURIComponent(row.mpSubscriptionId));
+   if(String(remote?.id)!==row.mpSubscriptionId) throw new ServiceUnavailableException('La suscripción requiere revisión');
+  } else if(reservation.create) {
+   try { remote=await this.mp('/preapproval',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    reason:'Diseñolys - Tienda Online',external_reference:commerceId,payer_email:row.payerEmail,
+    auto_recurring:{frequency:1,frequency_type:'months',transaction_amount:BILLING_MONTHLY_ARS,currency_id:'ARS'},
+    back_url:front+(fromPlan?'/admin/plan?pago=pendiente':'/registro/resultado'),notification_url:webhook,status:'pending',
+   })}); } catch(error) {
+    // An explicit validation/auth rejection is safe to retry; timeouts and 5xx remain uncertain.
+    if((error as any)?.definitiveRejection) await this.db.sequelize.transaction(async transaction=>{
+     const fresh=await BillingSubscription.findByPk(commerceId,{transaction,lock:transaction.LOCK.UPDATE});
+     if(fresh && !fresh.mpSubscriptionId && fresh.status==='creating') await fresh.update({status:'checkout_failed'},{transaction});
+    });
+    throw error;
+   }
+  } else {
+   // Recover an uncertain response using the provider's persisted subscription. Never blindly POST again.
+   const list=await this.mp('/preapproval/search?'+new URLSearchParams({payer_email:row.payerEmail,limit:'100'}));
+   if(!Array.isArray(list.results)||list.paging?.total==null||!Number.isSafeInteger(Number(list.paging.total))||Number(list.paging.total)!==list.results.length)
+    throw new ServiceUnavailableException('No pudimos confirmar el intento anterior. Reintentá en unos minutos.');
+   const matches=list.results.filter((item:any)=>String(item.external_reference)===commerceId);
+   if(matches.length!==1 || !matches[0].id) throw new ServiceUnavailableException('Todavía no pudimos confirmar el intento anterior. No se generó otro cobro. Reintentá en unos minutos.');
+   remote=await this.mp('/preapproval/'+encodeURIComponent(String(matches[0].id)));
+  }
+  this.validateSubscription(remote,row,String(owner.id));
+  if(!['pending','authorized','paused','cancelled','canceled'].includes(remote.status)) throw new ServiceUnavailableException('El estado de la suscripción requiere revisión');
+  const checkoutUrl=remote.status==='pending'?safeSubscriptionCheckout(remote.init_point,String(remote.id)):null;
+  if(remote.status==='pending' && !checkoutUrl) throw new ServiceUnavailableException('Mercado Pago no devolvió un enlace de pago válido');
+  await this.db.sequelize.transaction(async transaction=>{
+   const fresh=await BillingSubscription.findByPk(commerceId,{transaction,lock:transaction.LOCK.UPDATE});
+   if(!fresh || (fresh.mpSubscriptionId && fresh.mpSubscriptionId!==String(remote.id))) throw new ConflictException('El estado del plan cambió. Actualizá la información.');
+   // Never overwrite a payment or status that a concurrent webhook has already confirmed.
+   await fresh.update({mpSubscriptionId:String(remote.id),checkoutUrl,
+    ...(!fresh.paidThrough?{status:remote.status==='authorized'?'authorized':remote.status==='pending'?'pending':'cancelled'}:{})},{transaction});
+  });
+  if(remote.status==='authorized') return {checkoutUrl:null,status:'authorized',message:'Tu suscripción ya está autorizada. Usá Verificar pago para consultar su acreditación. Si el débito fue rechazado, revisá el medio de pago en Suscripciones de tu cuenta de Mercado Pago.'};
+  if(remote.status!=='pending') throw new ConflictException('Esta suscripción está pausada o cancelada. Revisala en tu cuenta de Mercado Pago antes de continuar.');
+  // If another browser just paid, do not offer the stale pending checkout again.
+  const fresh=await BillingSubscription.findByPk(commerceId);
+  if(fresh?.paidThrough || await BillingPayment.findOne({where:{commerceId}})) return {checkoutUrl:null,status:'active',message:'Ya hay un pago acreditado. Actualizá la información de tu plan.'};
+  return {checkoutUrl,status:'pending'};
+ }
+ async refreshPlanPayment(commerceId:string|null) {
+  if(!commerceId) throw new BadRequestException('La sesión no tiene un comercio asociado');
+  const row=await BillingSubscription.findByPk(commerceId);
+  if(!row?.mpSubscriptionId) return {processed:false};
+  return this.reconcileSubscription(row.mpSubscriptionId);
  }
  async reconcileSubscription(preapprovalId:string) {
   if(!/^[a-z0-9-]{5,100}$/i.test(preapprovalId)) throw new BadRequestException('Suscripción inválida');

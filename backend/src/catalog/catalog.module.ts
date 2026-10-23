@@ -1,3 +1,4 @@
+import { BillingModule } from '../billing/billing.module';
 import { MpConnectionService } from './mp-connection.service';
 import { MpConnectionController } from './mp-connection.controller';
 import { OrderEmailWorker } from './order-email-worker.service';
@@ -28,7 +29,7 @@ import { AdminPlanController } from './admin-plan.controller';
 import { AdminPlanService } from './admin-plan.service';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, BillingModule],
   controllers: [MpConnectionController, CatalogController, CatalogPublicController, AdminOrdersController, AdminCustomersController, CustomerAccountController, AdminDashboardController, AdminCommerceSettingsController, AdminPlanController],
   providers: [MpConnectionService, OrderEmailWorker, ReservationWorker, CatalogService, PublicCatalogService, PublicCartService, PublicCheckoutService, OrderEmailService, MercadoPagoService, AdminOrdersService, AdminCustomersService, CustomerAccountService, AdminDashboardService, AdminCommerceSettingsService, AdminPlanService, AuthGuard, RolesGuard],
 })

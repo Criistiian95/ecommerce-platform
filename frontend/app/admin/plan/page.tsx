@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
+import PlanPaymentCard from './plan-payment-card';
 import AdminLogoutButton from '../logout-button';
 import AdminStoreLink from '../store-link';
 import { platformWhatsAppUrl } from '../../platform-whatsapp';
@@ -57,10 +58,11 @@ export default function MerchantPlanPage() {
           </div>
         </section>
 
+        <PlanPaymentCard data={data} onUpdated={refresh} />
+
         <section className={styles.helpCard} aria-label="Gestión del abono">
-          <div><h2>Tu próxima renovación</h2><p>{sub?.paidThrough ? 'La fecha de fin del período indica hasta cuándo tenés cobertura abonada. El próximo débito depende del calendario de Mercado Pago; no se considera pagado hasta su acreditación.' : 'La primera acreditación definirá el período abonado. Si necesitás revisar tu situación o la forma de pago, escribinos.'}</p><small>Los pagos de las ventas de tu comercio se consultan en Pedidos. Este módulo muestra únicamente el abono de Diseñolys.</small></div>
+          <div><h2>Tu próxima renovación</h2><p>{sub?.paidThrough ? 'La fecha de fin del período indica hasta cuándo tenés cobertura abonada. El próximo débito depende del calendario de Mercado Pago; no se considera pagado hasta su acreditación.' : 'La primera acreditación definirá el período abonado. Podés iniciar o continuar el pago desde esta página.'}</p><small>Los pagos de las ventas de tu comercio se consultan en Pedidos. Este módulo muestra únicamente el abono de Diseñolys.</small></div>
           <div className={styles.helpActions}>
-            {sub?.checkoutUrl && <a className="btn primary" href={sub.checkoutUrl} rel="noopener noreferrer" target="_blank">Continuar pago en Mercado Pago ↗</a>}
             {whatsapp ? <a className={styles.whatsapp} href={whatsapp} target="_blank" rel="noopener noreferrer">Consultar por WhatsApp ↗</a> : <Link className="btn" href="/contacto">Contactar a Diseñolys</Link>}
           </div>
         </section>

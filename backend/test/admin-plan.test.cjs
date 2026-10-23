@@ -27,6 +27,7 @@ test('existing stores with no subscription retain their status and get no checko
   fixture(); process.env.BILLING_ENABLED = 'true';
   const p = await new AdminPlanService().getPlan('store-a');
   assert.equal(p.commerce.active, true); assert.equal(p.subscription, null); assert.equal(p.lastPayment, null);
+  assert.equal(p.paymentAction.kind, 'start'); assert.equal(p.paymentAction.amountArs, 39900);
   assert.equal(p.currentOffer.amountArs, 39900); assert.equal(p.payments.length, 0);
 });
 test('history is tenant-scoped, paginated, and the last payment is independent of the history page', async () => {
@@ -35,7 +36,7 @@ test('history is tenant-scoped, paginated, and the last payment is independent o
   process.env.BILLING_ENABLED = 'true';
   const p = await new AdminPlanService().getPlan('store-a', 2);
   assert.equal(p.payments.length, 2); assert.equal(p.lastPayment.id, 'p0'); assert.equal(p.pagination.total, 12);
-  assert.equal(p.subscription.paidThrough, '2026-11-23T12:00:00.000Z'); assert.equal(p.subscription.checkoutUrl, null);
+  assert.equal(p.subscription.paidThrough, '2026-11-23T12:00:00.000Z'); assert.equal(p.subscription.checkoutUrl, null); assert.equal(p.paymentAction.kind, 'none');
   assert.ok(!JSON.stringify(p).includes('private@example.com')); assert.ok(!JSON.stringify(p).includes('private-id'));
 });
 test('only pending unpaid subscriptions with billing enabled expose a genuine Mercado Pago checkout', async () => {
