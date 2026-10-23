@@ -36,6 +36,21 @@ async function fixture(stock = 10) {
   const request = { checkoutKey: randomUUID(), customerName: 'Test', customerEmail: 'test@example.com', customerPhone: '123', deliveryMethod: 'pickup', items: [{ productId: product.id, quantity: 2 }] };
   return { commerce, user, product, checkout, request, preferences: () => preferences };
 }
+test('MySQL: merchant plan reads only its own subscription and confirmed payment history', async () => {
+  const { AdminPlanService } = require('../dist/catalog/admin-plan.service');
+  const { BillingSubscription } = require('../dist/database/models/billing-subscription.model');
+  const { BillingPayment } = require('../dist/database/models/billing-payment.model');
+  const a = await fixture(), b = await fixture();
+  const approved = new Date('2026-10-23T12:00:00Z'), through = new Date('2026-11-23T12:00:00Z');
+  await BillingSubscription.create({ commerceId: a.commerce.id, payerEmail: 'plan-test@example.com', amountArs: 39900, status: 'active', paidThrough: through, startedAt: approved });
+  const p = await BillingPayment.create({ commerceId: a.commerce.id, mpPaymentId: randomUUID(), mpInvoiceId: randomUUID(), approvedAt: approved });
+  await BillingPayment.create({ commerceId: b.commerce.id, mpPaymentId: randomUUID(), mpInvoiceId: randomUUID(), approvedAt: approved });
+  const result = await new AdminPlanService().getPlan(a.commerce.id);
+  assert.equal(result.commerce.id, a.commerce.id);
+  assert.equal(result.pagination.total, 1); assert.equal(result.payments[0].id, p.id);
+  assert.equal(result.lastPayment.id, p.id); assert.equal(result.subscription.paidThrough, through.toISOString());
+  assert.equal(result.subscription.checkoutUrl, null);
+});
 test('MySQL: versioned legacy upgrade is repeatable and startup is read-only', async () => {
   for (const column of ['checkout_key', 'checkout_hash', 'reservation_expires_at', 'reservation_checked_at', 'payment_review_required']) {
     await db.sequelize.query(`ALTER TABLE orders DROP COLUMN ${column}`);
