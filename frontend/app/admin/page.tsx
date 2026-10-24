@@ -1,5 +1,6 @@
 'use client';
 import AdminNavigation from './navigation';
+import { fileToBase64, productSaveError } from './product-image';
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -27,35 +28,6 @@ type Product = {
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3003';
 
-async function fileToBase64(file: File) {
-  if (file.size > 2 * 1024 * 1024) {
-    throw new Error('La imagen no puede superar 2 MB.');
-  }
-
-  const allowed = ['image/jpeg', 'image/png', 'image/webp'];
-  if (!allowed.includes(file.type)) {
-    throw new Error('La imagen debe ser JPG, PNG o WebP.');
-  }
-
-  return await new Promise<{ data: string; mimeType: string }>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('No se pudo leer la imagen.'));
-    reader.onload = () => {
-      const result = String(reader.result ?? '');
-      const comma = result.indexOf(',');
-      if (comma === -1) {
-        reject(new Error('No se pudo procesar la imagen.'));
-        return;
-      }
-      resolve({
-        data: result.slice(comma + 1),
-        mimeType: file.type,
-      });
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
 export default function AdminPage() {
   const [token, setToken] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
@@ -64,6 +36,7 @@ export default function AdminPage() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [savingCategory, setSavingCategory] = useState(false);
   const [savingProduct, setSavingProduct] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const productsSectionRef = useRef<HTMLElement | null>(null);
 
   const authHeaders = useMemo(
@@ -72,12 +45,14 @@ export default function AdminPage() {
   );
 
   useEffect(() => {
-    if (!toast) return;
+    if (!toast || toast.type === 'error') return;
     const timer = window.setTimeout(() => setToast(null), 3500);
     return () => window.clearTimeout(timer);
   }, [toast]);
 
   async function apiMessage(response: Response, fallback: string) {
+    if (response.status === 401) return 'Tu sesión venció. Volvé a iniciar sesión para continuar.';
+    if (response.status === 413) return 'El archivo es demasiado pesado. Elegí una imagen de hasta 2 MB.';
     try {
       const data = await response.clone().json();
       if (typeof data?.message === 'string') return data.message;
@@ -90,21 +65,40 @@ export default function AdminPage() {
     product => product.active && product.currentStock <= product.minimumStock,
   );
 
-  async function refresh(currentToken = token) {
-    if (!currentToken) return;
-    const headers = { Authorization: `Bearer ${currentToken}` };
-    const [catRes, prodRes] = await Promise.all([
-      fetch(`${API}/admin/catalog/categories`, { headers }),
-      fetch(`${API}/admin/catalog/products`, { headers }),
-    ]);
+  async function refresh(currentToken = token, showError = true) {
+    if (!currentToken) return false;
+    setRefreshing(true);
+    try {
+      const headers = { Authorization: `Bearer ${currentToken}` };
+      const [catRes, prodRes] = await Promise.all([
+        fetch(`${API}/admin/catalog/categories`, { headers }),
+        fetch(`${API}/admin/catalog/products`, { headers }),
+      ]);
 
-    if (!catRes.ok || !prodRes.ok) {
-      setToast({ type: 'error', text: 'No se pudo cargar el panel. Revisá el acceso del usuario.' });
-      return;
+      if (!catRes.ok || !prodRes.ok) {
+        const failed = !catRes.ok ? catRes : prodRes;
+        if (showError) setToast({ type: 'error', text: await apiMessage(failed, 'No se pudo cargar el panel. Intentá actualizar la lista.') });
+        return false;
+      }
+
+      const [nextCategories, nextProducts] = await Promise.all([catRes.json(), prodRes.json()]);
+      setCategories(nextCategories);
+      setProducts(nextProducts);
+      return true;
+    } catch {
+      if (showError) setToast({ type: 'error', text: 'No se pudo actualizar la lista. Revisá tu conexión e intentá nuevamente.' });
+      return false;
+    } finally {
+      setRefreshing(false);
     }
+  }
 
-    setCategories(await catRes.json());
-    setProducts(await prodRes.json());
+  async function refreshAfterSave(success: string) {
+    const refreshed = await refresh(token, false);
+    setToast({
+      type: refreshed ? 'success' : 'error',
+      text: refreshed ? success : `${success} No se pudo actualizar la lista; usá «Actualizar lista» para verlo. No repitas la carga.`,
+    });
   }
 
   useEffect(() => {
@@ -135,10 +129,9 @@ export default function AdminPage() {
       }
 
       target.reset();
-      await refresh();
-      setToast({ type: 'success', text: 'Categoría creada correctamente.' });
+      await refreshAfterSave('Categoría creada correctamente.');
     } catch {
-      setToast({ type: 'error', text: 'No se pudo conectar con el servidor.' });
+      setToast({ type: 'error', text: productSaveError(null) });
     } finally {
       setSavingCategory(false);
     }
@@ -146,6 +139,7 @@ export default function AdminPage() {
 
   async function createProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (savingProduct) return;
     const target = event.currentTarget;
     const form = new FormData(target);
     setSavingProduct(true);
@@ -188,13 +182,12 @@ export default function AdminPage() {
       }
 
       target.reset();
-      await refresh();
-      setToast({ type: 'success', text: 'Producto creado correctamente.' });
+      await refreshAfterSave('Producto creado correctamente.');
       window.setTimeout(() => {
         productsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
-    } catch {
-      setToast({ type: 'error', text: 'No se pudo conectar con el servidor.' });
+    } catch (error) {
+      setToast({ type: 'error', text: productSaveError(error) });
     } finally {
       setSavingProduct(false);
     }
@@ -202,55 +195,48 @@ export default function AdminPage() {
 
   async function saveProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!editing) return;
+    if (!editing || savingProduct) return;
+    setSavingProduct(true);
 
     const form = new FormData(event.currentTarget);
-    let uploaded: { data: string; mimeType: string } | null = null;
-
     try {
       const imageFile = form.get('imageFile');
-      uploaded =
+      const uploaded =
         imageFile instanceof File && imageFile.size > 0
           ? await fileToBase64(imageFile)
           : null;
-    } catch (error) {
-      setToast({
-        type: 'error',
-        text: error instanceof Error ? error.message : 'No se pudo procesar la imagen.',
+      const response = await fetch(`${API}/admin/catalog/products/${editing.id}`, {
+        method: 'PATCH',
+        headers: authHeaders,
+        body: JSON.stringify({
+          sku: form.get('sku'),
+          name: form.get('name'),
+          description: form.get('description') || null,
+          brand: form.get('brand') || null,
+          price: Number(form.get('price')),
+          cost: form.get('cost') ? Number(form.get('cost')) : null,
+          offerPrice: form.get('offerPrice') ? Number(form.get('offerPrice')) : null,
+          published: form.get('published') === 'on',
+          featured: form.get('featured') === 'on',
+          categoryId: form.get('categoryId') || null,
+          minimumStock: Number(form.get('minimumStock') || 0),
+          imageUrl: uploaded ? null : (form.get('imageUrl') || null),
+          imageDataBase64: uploaded?.data ?? null,
+          imageMimeType: uploaded?.mimeType ?? null,
+          clearUploadedImage: !uploaded && Boolean(form.get('imageUrl')),
+        }),
       });
-      return;
-    }
 
-    const response = await fetch(`${API}/admin/catalog/products/${editing.id}`, {
-      method: 'PATCH',
-      headers: authHeaders,
-      body: JSON.stringify({
-        sku: form.get('sku'),
-        name: form.get('name'),
-        description: form.get('description') || null,
-        brand: form.get('brand') || null,
-        price: Number(form.get('price')),
-        cost: form.get('cost') ? Number(form.get('cost')) : null,
-        offerPrice: form.get('offerPrice') ? Number(form.get('offerPrice')) : null,
-        published: form.get('published') === 'on',
-        featured: form.get('featured') === 'on',
-        categoryId: form.get('categoryId') || null,
-        minimumStock: Number(form.get('minimumStock') || 0),
-        imageUrl: uploaded ? null : (form.get('imageUrl') || null),
-        imageDataBase64: uploaded?.data ?? null,
-        imageMimeType: uploaded?.mimeType ?? null,
-        clearUploadedImage: !uploaded && Boolean(form.get('imageUrl')),
-      }),
-    });
-
-    if (!response.ok) {
-      setToast({ type: 'error', text: await apiMessage(response, 'No se pudo actualizar el producto.') });
-      return;
-    }
-    setToast({ type: 'success', text: 'Producto actualizado correctamente.' });
-    if (response.ok) {
+      if (!response.ok) {
+        setToast({ type: 'error', text: await apiMessage(response, 'No se pudo actualizar el producto.') });
+        return;
+      }
       setEditing(null);
-      await refresh();
+      await refreshAfterSave('Producto actualizado correctamente.');
+    } catch (error) {
+      setToast({ type: 'error', text: productSaveError(error) });
+    } finally {
+      setSavingProduct(false);
     }
   }
 
@@ -385,7 +371,7 @@ export default function AdminPage() {
               <h2>Editar producto</h2>
               <p>{editing.name}</p>
             </div>
-            <button className="btn secondary" onClick={() => setEditing(null)}>Cancelar</button>
+            <button className="btn secondary" disabled={savingProduct} onClick={() => setEditing(null)}>Cancelar</button>
           </div>
           <form key={editing.id} onSubmit={saveProduct}>
             <div className="admin-grid">
@@ -418,13 +404,18 @@ export default function AdminPage() {
                 <input name="imageUrl" type="url" defaultValue={editing.imageUrl ?? ''} placeholder="https://..." />
               </label>
             </div>
-            <button className="btn primary" type="submit">Guardar cambios</button>
+            <button className="btn primary" type="submit" disabled={savingProduct}>{savingProduct ? 'Guardando...' : 'Guardar cambios'}</button>
           </form>
         </section>
       )}
 
       <section ref={productsSectionRef} className="card products-section" style={{marginTop:24}}>
-        <h2>Productos</h2>
+        <div className="section-head">
+          <h2>Productos</h2>
+          <button className="btn secondary" type="button" disabled={refreshing || savingProduct || savingCategory} onClick={async () => {
+            if (await refresh()) setToast({ type: 'success', text: 'Lista actualizada.' });
+          }}>{refreshing ? 'Actualizando...' : 'Actualizar lista'}</button>
+        </div>
         <div style={{overflowX:'auto'}}>
           <table className="admin-table">
             <thead>
