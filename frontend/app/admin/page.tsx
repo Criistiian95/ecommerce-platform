@@ -36,6 +36,7 @@ export default function AdminPage() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [savingCategory, setSavingCategory] = useState(false);
   const [savingProduct, setSavingProduct] = useState(false);
+  const [processingImage, setProcessingImage] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const productsSectionRef = useRef<HTMLElement | null>(null);
 
@@ -52,7 +53,7 @@ export default function AdminPage() {
 
   async function apiMessage(response: Response, fallback: string) {
     if (response.status === 401) return 'Tu sesión venció. Volvé a iniciar sesión para continuar.';
-    if (response.status === 413) return 'El archivo es demasiado pesado. Elegí una imagen de hasta 2 MB.';
+    if (response.status === 413) return 'No se pudo enviar la foto optimizada. Probá seleccionarla nuevamente.';
     try {
       const data = await response.clone().json();
       if (typeof data?.message === 'string') return data.message;
@@ -146,10 +147,12 @@ export default function AdminPage() {
 
     try {
       const imageFile = form.get('imageFile');
+      setProcessingImage(imageFile instanceof File && imageFile.size > 0);
       const uploaded =
         imageFile instanceof File && imageFile.size > 0
           ? await fileToBase64(imageFile)
           : null;
+      setProcessingImage(false);
 
       const response = await fetch(`${API}/admin/catalog/products`, {
         method: 'POST',
@@ -189,6 +192,7 @@ export default function AdminPage() {
     } catch (error) {
       setToast({ type: 'error', text: productSaveError(error) });
     } finally {
+      setProcessingImage(false);
       setSavingProduct(false);
     }
   }
@@ -201,10 +205,12 @@ export default function AdminPage() {
     const form = new FormData(event.currentTarget);
     try {
       const imageFile = form.get('imageFile');
+      setProcessingImage(imageFile instanceof File && imageFile.size > 0);
       const uploaded =
         imageFile instanceof File && imageFile.size > 0
           ? await fileToBase64(imageFile)
           : null;
+      setProcessingImage(false);
       const response = await fetch(`${API}/admin/catalog/products/${editing.id}`, {
         method: 'PATCH',
         headers: authHeaders,
@@ -236,6 +242,7 @@ export default function AdminPage() {
     } catch (error) {
       setToast({ type: 'error', text: productSaveError(error) });
     } finally {
+      setProcessingImage(false);
       setSavingProduct(false);
     }
   }
@@ -352,14 +359,14 @@ export default function AdminPage() {
               </label>
               <label className="field full-field">Imagen (opcional)
                 <input name="imageFile" type="file" accept="image/jpeg,image/png,image/webp" />
-                <small>JPG, PNG o WebP. Máximo 2 MB.</small>
+                <small>JPG, PNG o WebP. Hasta 25 MB. La foto se optimiza automáticamente antes de subirla.</small>
               </label>
               <div className="image-divider full-field"><span>o</span></div>
               <label className="field full-field">URL de imagen (opcional)
                 <input name="imageUrl" type="url" placeholder="https://..." />
               </label>
             </div>
-            <button className="btn primary" type="submit" disabled={savingProduct}>{savingProduct ? 'Creando...' : 'Crear producto'}</button>
+            <button className="btn primary" type="submit" disabled={savingProduct}>{processingImage ? 'Optimizando foto...' : savingProduct ? 'Creando...' : 'Crear producto'}</button>
           </form>
         </article>
       </section>
@@ -397,14 +404,14 @@ export default function AdminPage() {
               </label>
               <label className="field full-field">Imagen nueva (opcional)
                 <input name="imageFile" type="file" accept="image/jpeg,image/png,image/webp" />
-                <small>Si elegís una foto, reemplaza la imagen actual.</small>
+                <small>JPG, PNG o WebP, hasta 25 MB. Se optimiza automáticamente y reemplaza la imagen actual.</small>
               </label>
               <div className="image-divider full-field"><span>o</span></div>
               <label className="field full-field">URL de imagen (opcional)
                 <input name="imageUrl" type="url" defaultValue={editing.imageUrl ?? ''} placeholder="https://..." />
               </label>
             </div>
-            <button className="btn primary" type="submit" disabled={savingProduct}>{savingProduct ? 'Guardando...' : 'Guardar cambios'}</button>
+            <button className="btn primary" type="submit" disabled={savingProduct}>{processingImage ? 'Optimizando foto...' : savingProduct ? 'Guardando...' : 'Guardar cambios'}</button>
           </form>
         </section>
       )}

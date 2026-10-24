@@ -59,10 +59,10 @@ function setup(fetch, imageFile = null) {
 }
 
 test('creating with an oversized photo preserves the form, shows the cause and sends no request', async () => {
-  const form = setup(() => { assert.fail('No request for an invalid photo'); }, { size: 3 * 1024 * 1024, type: 'image/jpeg' });
+  const form = setup(() => { assert.fail('No request for an invalid photo'); }, { size: 26 * 1024 * 1024, type: 'image/jpeg' });
   await form.submit();
   assert.equal(form.resets, 0);
-  assert.match(form.toast.text, /supera los 2 MB/);
+  assert.match(form.toast.text, /supera los 25 MB/);
   assert.equal(form.toast.type, 'error');
 });
 
