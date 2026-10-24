@@ -5,7 +5,7 @@ import {BillingPayment} from '../database/models/billing-payment.model';
 import {BILLING_MONTHLY_ARS,nextPaidThrough} from './billing-rules';
 import {DatabaseService} from '../database/database.service';
 import {User} from '../database/models/user.model';
-import {safeSubscriptionCheckout} from './checkout-policy';
+import {safeSubscriptionCheckout,subscriptionEmailMatches} from './checkout-policy';
 
 @Injectable()
 export class BillingService {
@@ -34,7 +34,7 @@ export class BillingService {
  }
  private validateSubscription(remote:any,row:{commerceId:string;payerEmail:string},collectorId:string) {
   if(!remote?.id || String(remote.collector_id)!==collectorId) throw new ServiceUnavailableException('La suscripción apunta a otra cuenta receptora');
-  if(String(remote.external_reference)!==row.commerceId || remote.payer_email?.toLowerCase()!==row.payerEmail.toLowerCase() ||
+  if(String(remote.external_reference)!==row.commerceId || !subscriptionEmailMatches(remote.payer_email,row.payerEmail) ||
     remote.auto_recurring?.currency_id!=='ARS' || Number(remote.auto_recurring?.transaction_amount)!==BILLING_MONTHLY_ARS ||
     remote.auto_recurring?.frequency!==1 || remote.auto_recurring?.frequency_type!=='months')
     throw new ServiceUnavailableException('La respuesta de Mercado Pago requiere revisión');
@@ -158,7 +158,7 @@ export class BillingService {
   if(!/^[a-z0-9-]{5,100}$/i.test(mpId)) throw new BadRequestException('ID inválido');
   const remote=await this.mp('/preapproval/'+encodeURIComponent(mpId));
   const billing=await BillingSubscription.findOne({where:{mpSubscriptionId:mpId}});
-  if(!billing || String(remote.id)!==mpId || String(remote.external_reference)!==billing.commerceId || remote.status!=='authorized' || remote.payer_email?.toLowerCase()!==billing.payerEmail.toLowerCase() ||
+  if(!billing || String(remote.id)!==mpId || String(remote.external_reference)!==billing.commerceId || remote.status!=='authorized' || !subscriptionEmailMatches(remote.payer_email,billing.payerEmail) ||
      remote.auto_recurring?.currency_id!=='ARS' || Number(remote.auto_recurring?.transaction_amount)!==billing.amountArs ||
      remote.auto_recurring?.frequency!==1 || remote.auto_recurring?.frequency_type!=='months') return {verified:false};
   // Authorization alone does not prove a successful debit: activation is exclusively tied to verified payment.
@@ -172,7 +172,7 @@ export class BillingService {
   const sub=await BillingSubscription.findOne({where:{mpSubscriptionId:subId}});
   if(!sub) return {processed:false};
   const subscription=await this.mp('/preapproval/'+encodeURIComponent(subId));
-  if(subscription.status!=='authorized' || String(subscription.external_reference)!==sub.commerceId || subscription.payer_email?.toLowerCase()!==sub.payerEmail.toLowerCase() ||
+  if(String(subscription.id)!==subId || subscription.status!=='authorized' || String(subscription.external_reference)!==sub.commerceId || !subscriptionEmailMatches(subscription.payer_email,sub.payerEmail) ||
      subscription.auto_recurring?.currency_id!=='ARS'||Number(subscription.auto_recurring?.transaction_amount)!==BILLING_MONTHLY_ARS ||
      subscription.auto_recurring?.frequency!==1 || subscription.auto_recurring?.frequency_type!=='months') return {processed:false};
   // Subscription authorization and authorized-payment authorization are different states.

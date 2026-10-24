@@ -1,5 +1,6 @@
 'use client';
 import AdminLogoutButton from '../logout-button';
+import AdminNavigation from '../navigation';
 import Link from 'next/link';
 import { transparentLogo } from '../../logo-background';
 import { coverGroups, storeCovers, storeCover, type CoverGroup } from '../../store-covers';
@@ -88,7 +89,7 @@ export default function Personalizar(){
   if(!token)return <main className="shell"><div style={{display:"flex",justifyContent:"flex-end"}}><AdminLogoutButton /></div><h1>Personalizar mi tienda</h1><p>Ingresá con tu cuenta de administrador.</p><Link href="/login">Iniciar sesión</Link></main>;
   const storePath=isTenantDomain?'/':`/tienda/${encodeURIComponent(settings?.slug||'')}`;
   return <main className={styles.page}>
-    <header className={styles.header}><Link href="/admin/dashboard">← Panel del comercio</Link><strong>DISEÑOLYS</strong><Link href="/admin/configuracion">Configuración y cobros</Link></header>
+    <header className={styles.header}><strong>DISEÑOLYS</strong><AdminNavigation /></header>
     <div className={styles.heading}><span>TU MARCA, TU TIENDA</span><h1>Personalizar mi tienda</h1><p>Probá tu logo y tus colores sobre tu catálogo real. Publicá el diseño cuando esté listo.</p></div>
     {error&&<p className={styles.error} role="alert">{error}</p>}{message&&<p className={styles.success} role="status">{message}</p>}
     {!design?<div><p>Cargando tu tienda…</p>{error&&<button onClick={()=>load(token)}>Reintentar</button>}</div>:<div className={styles.workspace}>

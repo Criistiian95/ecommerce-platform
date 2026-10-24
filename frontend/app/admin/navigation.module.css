@@ -1,0 +1,19 @@
+.navigation:global(.admin-nav){position:relative;display:flex;align-items:center;gap:12px;overflow:visible;flex-wrap:wrap;padding:0}
+.dropdown{position:relative;flex-shrink:0;z-index:30}
+.toggle{display:flex;align-items:center;justify-content:center;gap:9px;min-height:44px;box-sizing:border-box;padding:9px 14px;border:1px solid #d5e0f0;border-radius:10px;background:#f5f8fe;color:#254a83;font-size:13px;font-weight:750;cursor:pointer;list-style:none;user-select:none}
+.toggle::-webkit-details-marker{display:none}
+.toggle::marker{content:''}
+.toggle:hover,.dropdown[open]>.toggle{background:#eaf1ff;border-color:#b8ccef;color:#1746a2}
+.toggle:focus-visible,.item:focus-visible{outline:3px solid #245ce6;outline-offset:3px}
+.menu{position:absolute;top:calc(100% + 9px);left:0;width:255px;max-width:calc(100vw - 48px);max-height:70vh;max-height:min(70dvh,480px);overflow-y:auto;padding:10px;background:#fff;border:1px solid #dbe4f1;border-radius:14px;box-shadow:0 14px 38px #17223824;box-sizing:border-box}
+.caption{display:block;padding:9px 11px 10px;font-size:10px;letter-spacing:.11em;font-weight:800;color:#78879c}
+.item{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:11px 12px;min-height:44px;box-sizing:border-box;border-radius:9px;font-size:13px;font-weight:650;color:#435570;text-decoration:none}
+.item>span{font-size:17px;color:#9aa9be}
+.item:hover{background:#f3f6fb;color:#203d69}
+.item.active{background:#eaf1ff;color:#245ce6}
+.item.active>span{font-size:8px;color:currentColor}
+.actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.actions :global(.admin-store-link){margin:0;padding:9px 12px;min-height:44px;box-sizing:border-box;border:1px solid #d5e0f0;border-radius:10px;background:#fff}
+.actions :global(.admin-logout-button){min-height:44px;box-sizing:border-box}
+@media(max-width:900px){.navigation:global(.admin-nav){width:100%;justify-content:space-between}.actions{margin-left:auto}}
+@media(max-width:480px){.navigation:global(.admin-nav){gap:8px}.toggle{width:44px;padding:10px}.toggle>span{display:none}.actions{gap:6px}.actions :global(.admin-store-link),.actions :global(.admin-logout-button){font-size:11px;padding:8px}.actions :global(.admin-logout-button){gap:5px}}

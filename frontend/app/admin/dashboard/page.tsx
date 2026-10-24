@@ -1,6 +1,5 @@
 'use client';
-import AdminLogoutButton from '../logout-button';
-import AdminStoreLink from '../store-link';
+import AdminNavigation from '../navigation';
 import PlanSummary from '../plan/plan-summary';
 
 import Link from 'next/link';
@@ -114,17 +113,7 @@ export default function AdminDashboardPage(){
           <div className="brand">Panel del comercio</div>
           <small>Resumen general del negocio</small>
         </div>
-        <nav className="admin-nav" aria-label="Navegación del panel">
-          <AdminLogoutButton />
-          <Link className="admin-nav-link active" href="/admin/dashboard">Dashboard</Link>
-          <Link className="admin-nav-link" href="/admin">Productos</Link>
-          <Link className="admin-nav-link" href="/admin/pedidos">Pedidos</Link>
-          <Link className="admin-nav-link" href="/admin/clientes">Clientes</Link>
-          <Link className="admin-nav-link" href="/admin/plan">Mi plan</Link>
-          <Link className="admin-nav-link" href="/admin/configuracion">Configuración</Link>
-          <Link className="admin-nav-link" href="/admin/personalizar">Personalizar mi tienda</Link>
-          <AdminStoreLink />
-        </nav>
+        <AdminNavigation />
       </header>
 
       <section className="dashboard-heading">
