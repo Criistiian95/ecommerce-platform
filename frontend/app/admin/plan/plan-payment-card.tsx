@@ -46,8 +46,9 @@ export default function PlanPaymentCard({ data, onUpdated }: { data: MerchantPla
 
   return <section id="pagar-cuota" className={styles.paymentCard} aria-label="Pago de la cuota" aria-busy={!!busy}>
     {offer ? <>
-      <div><span className={styles.kicker}>{offer.firstPayment ? 'PRIMERA CUOTA' : 'CUOTA SIN ACREDITAR'}</span><h2>Pagar cuota</h2>
+      <div><span className={styles.kicker}>{offer.firstPayment ? 'PRIMERA CUOTA' : 'CUOTA SIN ACREDITAR'}</span><h2>{data.trial ? 'Activar mi abono' : 'Pagar cuota'}</h2>
         <div className={styles.price}>${offer.amountArs.toLocaleString('es-AR')}<span>ARS por mes</span></div>
+        {data.trial && !data.trial.expired && <p>Podés seguir usando tu prueba hasta su vencimiento. Si activás el abono ahora, el período pago empieza al acreditarse la primera cuota.</p>}
         <p>Continuá en Mercado Pago para elegir el medio de pago y confirmar tu suscripción mensual.</p>
         {offer.firstPayment && <small>Este importe corresponde al inicio del abono. No incluye deuda por meses anteriores.</small>}
       </div>

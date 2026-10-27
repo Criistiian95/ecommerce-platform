@@ -35,6 +35,9 @@ export class Commerce extends Model {
   declare pickupEnabled: boolean;
   declare shippingEnabled: boolean;
   declare active: boolean;
+  declare trialStartedAt: Date | null;
+  declare trialEndsAt: Date | null;
+  declare trialConvertedAt: Date | null;
 
   static register(sequelize: Sequelize) {
     Commerce.init(
@@ -136,6 +139,9 @@ export class Commerce extends Model {
           defaultValue: true,
           field: 'shipping_enabled',
         },
+        trialStartedAt: { type: DataTypes.DATE, allowNull: true, field: 'trial_started_at' },
+        trialEndsAt: { type: DataTypes.DATE, allowNull: true, field: 'trial_ends_at' },
+        trialConvertedAt: { type: DataTypes.DATE, allowNull: true, field: 'trial_converted_at' },
         active: {
           type: DataTypes.BOOLEAN,
           allowNull: false,

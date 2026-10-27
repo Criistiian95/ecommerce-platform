@@ -36,13 +36,13 @@ export default function MerchantPlanPage() {
           <div className={styles.planCard}>
             <div className={styles.cardTop}><span className={styles.kicker}>DISEÑOLYS · TIENDA ONLINE</span><span className={`${styles.badge} ${styles[info.tone]}`}>{info.label}</span></div>
             <h2>{data.commerce.name}</h2>
-            {sub ? <div className={styles.price}>{money(sub.amountArs)}<span>ARS por mes</span></div> : <div className={styles.noPlan}>Sin abono automático asociado</div>}
+            {sub ? <div className={styles.price}>{money(sub.amountArs)}<span>ARS por mes</span></div> : <div className={styles.noPlan}>{data.trial ? '15 días gratis, sin tarjeta' : 'Sin abono automático asociado'}</div>}
             <p>{info.message}</p>
             <div className={styles.storeState}><span className={`${styles.dot} ${data.commerce.active ? styles.activeDot : styles.inactiveDot}`} /><strong>{data.commerce.active ? 'Tu tienda está activa' : 'Tu tienda está inactiva'}</strong></div>
             {!data.billingEnabled && sub && <p className={styles.note}>La creación de nuevas suscripciones está deshabilitada por el momento. Contactanos si necesitás continuar un pago.</p>}
           </div>
           <div className={styles.dates}>
-            <article className={styles.dateCard}><span>Período abonado hasta</span><strong>{sub?.paidThrough ? planDate(sub.paidThrough, true) : 'Sin vencimiento registrado'}</strong><small>{sub?.paidThrough && info.daysLeft !== null ? (info.daysLeft === 0 ? 'El período abonado finalizó' : `Quedan aproximadamente ${info.daysLeft} día${info.daysLeft === 1 ? '' : 's'}`) : 'Se informa después de acreditar un pago.'}</small></article>
+            <article className={styles.dateCard}><span>{data.trial ? 'Tu prueba termina el' : 'Período abonado hasta'}</span><strong>{data.trial ? planDate(data.trial.endsAt, true) : sub?.paidThrough ? planDate(sub.paidThrough, true) : 'Sin vencimiento registrado'}</strong><small>{sub?.paidThrough && info.daysLeft !== null ? (info.daysLeft === 0 ? 'El período abonado finalizó' : `Quedan aproximadamente ${info.daysLeft} día${info.daysLeft === 1 ? '' : 's'}`) : data.trial ? 'Al finalizar, elegí activar el abono para continuar.' : 'Se informa después de acreditar un pago.'}</small></article>
             <article className={styles.dateCard}><span>Último pago acreditado</span><strong>{data.lastPayment ? planDate(data.lastPayment.approvedAt, true) : 'Sin pagos registrados'}</strong><small>{data.lastPayment ? `Referencia Mercado Pago: ${data.lastPayment.paymentReference}` : 'Acá verás los cobros confirmados de tu suscripción.'}</small></article>
           </div>
         </section>

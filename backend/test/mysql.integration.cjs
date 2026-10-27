@@ -64,7 +64,7 @@ test('MySQL: versioned legacy upgrade is repeatable and startup is read-only', a
   await db.onModuleInit();
   assert.equal(statements.some(sql => /ALTER|CREATE|DROP/i.test(sql)), false);
   const [versions] = await original('SELECT version FROM schema_migrations');
-  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font', '010_store_cover', '011_store_identity', '012_store_contact', '013_store_header', '014_platform_billing']);
+  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font', '010_store_cover', '011_store_identity', '012_store_contact', '013_store_header', '014_platform_billing', '015_commerce_trial']);
   const [indexes] = await db.sequelize.query("SHOW INDEX FROM orders WHERE Column_name = 'checkout_key'");
   assert.ok(indexes.some(index => index.Non_unique === 0));
 });
@@ -668,4 +668,28 @@ test('MySQL: parallel self-service requests create at most one subscription and 
  assert.equal(await BillingSubscription.count({where:{commerceId:a.commerce.id}}),1);
  assert.equal(await BillingSubscription.findByPk(b.commerce.id),null);
  assert.equal((await a.commerce.reload()).active,true);
+});
+
+test('MySQL trial: signup persists 15 days, expired store is blocked, owner can read plan and migration preserves legacy stores', async () => {
+  const { AuthService } = require('../dist/auth/auth.service');
+  const { AdminPlanService } = require('../dist/catalog/admin-plan.service');
+  const { PublicCartService } = require('../dist/catalog/public-cart.service');
+  const { newTrial } = require('../dist/billing/trial-policy');
+  const legacy = await fixture();
+  await runMigrations(db.sequelize);
+  assert.equal((await legacy.commerce.reload()).trialEndsAt,null);
+  assert.equal(legacy.commerce.active,true);
+  const slug='trial-'+randomUUID();
+  const result=await new AuthService(db,{createMerchantSubscription:()=>assert.fail('No subscription at signup')}).registerCommerce({commerceName:'Trial',commerceSlug:slug,adminName:'Owner',email:randomUUID()+'@example.com',password:'long-test-password'});
+  assert.equal(result.status,'trial');
+  const commerce=await Commerce.findOne({where:{slug}});
+  assert.equal(commerce.trialEndsAt-commerce.trialStartedAt,15*86400000);
+  assert.equal((await new AdminPlanService().getPlan(commerce.id)).trial.expired,false);
+  await commerce.update({trialEndsAt:new Date(Date.now()-1000)});
+  await assert.rejects(new PublicCartService().validateCart(slug,[]),/Comercio no encontrado/);
+  const expired=await new AdminPlanService().getPlan(commerce.id);
+  assert.equal(expired.trial.expired,true);assert.equal(expired.commerce.active,false);
+  assert.equal(await User.count({where:{commerceId:commerce.id}}),1);
+  await commerce.update({trialConvertedAt:new Date()});
+  assert.deepEqual(await new PublicCartService().validateCart(slug,[]),{valid:true,items:[]});
 });

@@ -1,3 +1,4 @@
+import { trialExpired } from '../billing/trial-policy';
 import { normalizeCartItems } from './cart-items';
 import { BadRequestException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { createHash, randomUUID } from 'crypto';
@@ -74,10 +75,10 @@ export class PublicCheckoutService {
 
     const commerce = await Commerce.findOne({
       where: { slug, active: true },
-      attributes: ['id', 'name', 'pickupEnabled', 'shippingEnabled'],
+      attributes: ['id', 'name', 'pickupEnabled', 'shippingEnabled','trialEndsAt','trialConvertedAt'],
     });
 
-    if (!commerce) {
+    if (!commerce || trialExpired(commerce)) {
       throw new NotFoundException('Comercio no encontrado');
     }
 

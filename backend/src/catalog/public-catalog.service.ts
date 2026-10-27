@@ -1,3 +1,4 @@
+import { trialExpired } from '../billing/trial-policy';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Category } from '../database/models/category.model';
 import { Commerce } from '../database/models/commerce.model';
@@ -9,7 +10,7 @@ export class PublicCatalogService {
     const commerce = await Commerce.findOne({
       where: { slug: commerceSlug, active: true },
       attributes: [
-        'accountDisplay','instagramUrl','facebookUrl','tiktokUrl','youtubeUrl','heroTitle','heroButtonText','announcementText','heroLayout','backgroundColor','coverPreset','id','fontFamily','updatedAt','name','slug','tagline','headerTagline','headerDisplay','primaryColor','secondaryColor',
+        'trialEndsAt','trialConvertedAt','accountDisplay','instagramUrl','facebookUrl','tiktokUrl','youtubeUrl','heroTitle','heroButtonText','announcementText','heroLayout','backgroundColor','coverPreset','id','fontFamily','updatedAt','name','slug','tagline','headerTagline','headerDisplay','primaryColor','secondaryColor',
         'logoUrl','logoMimeType','whatsapp','contactEmail','contactPhone',
         'address','businessHours','pickupEnabled','shippingEnabled',
         [Commerce.sequelize!.literal('(cover_data IS NOT NULL)'), 'hasUploadedCover'],
@@ -17,7 +18,7 @@ export class PublicCatalogService {
       ],
     });
 
-    if (!commerce) {
+    if (!commerce || trialExpired(commerce)) {
       throw new NotFoundException('Comercio no encontrado');
     }
 
@@ -115,18 +116,18 @@ export class PublicCatalogService {
   }
 
   async getCommerceCover(commerceSlug: string) {
-    const commerce = await Commerce.findOne({ where: {slug: commerceSlug, active: true, coverPreset: 'custom'}, attributes: ['coverData','coverMimeType'] });
-    if (!commerce?.coverData || !commerce.coverMimeType) throw new NotFoundException('Portada no encontrada');
+    const commerce = await Commerce.findOne({ where: {slug: commerceSlug, active: true, coverPreset: 'custom'}, attributes: ['coverData','coverMimeType','trialEndsAt','trialConvertedAt'] });
+    if (!commerce || trialExpired(commerce) || !commerce.coverData || !commerce.coverMimeType) throw new NotFoundException('Portada no encontrada');
     return {data: commerce.coverData, mimeType: commerce.coverMimeType};
   }
 
   async getCommerceLogo(commerceSlug: string) {
     const commerce = await Commerce.findOne({
       where: { slug: commerceSlug, active: true },
-      attributes: ['logoData', 'logoMimeType'],
+      attributes: ['logoData', 'logoMimeType','trialEndsAt','trialConvertedAt'],
     });
 
-    if (!commerce?.logoData || !commerce.logoMimeType) {
+    if (!commerce || trialExpired(commerce) || !commerce.logoData || !commerce.logoMimeType) {
       throw new NotFoundException('Logo no encontrado');
     }
 
