@@ -5,7 +5,7 @@ import { baseline } from './baseline';
 import { passwordRecoverySchema } from './password-recovery';
 
 type Query = (sql: string, values?: unknown[]) => Promise<any[]>;
-const versions = ['001_baseline', '002_legacy_checkout', '003_email_outbox', '004_customer_accounts', '005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font', '010_store_cover', '011_store_identity', '012_store_contact', '013_store_header', '014_platform_billing'];
+const versions = ['001_baseline', '002_legacy_checkout', '003_email_outbox', '004_customer_accounts', '005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font', '010_store_cover', '011_store_identity', '012_store_contact', '013_store_header', '014_platform_billing', '015_commerce_trial'];
 async function legacy(query: Query) {
   const columns: Record<string, Record<string, string>> = {
     products: { image_data: 'MEDIUMBLOB NULL', image_mime_type: 'VARCHAR(60) NULL', brand: 'VARCHAR(120) NULL', cost: 'DECIMAL(14,2) NULL', offer_price: 'DECIMAL(14,2) NULL', published: 'TINYINT(1) NOT NULL DEFAULT 1', featured: 'TINYINT(1) NOT NULL DEFAULT 0' },
@@ -190,6 +190,13 @@ export async function runMigrations(sequelize: Sequelize) {
           approved_at DATETIME NOT NULL, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL,
           FOREIGN KEY (commerce_id) REFERENCES commerces(id) ON DELETE RESTRICT
         ) ENGINE=InnoDB`);
+      }
+      if (version === '015_commerce_trial') {
+        // Nullable fields leave every existing merchant's access and billing unchanged.
+        for (const name of ['trial_started_at', 'trial_ends_at', 'trial_converted_at']) {
+          if (!(await query('SHOW COLUMNS FROM commerces WHERE Field = ?', [name])).length)
+            await query(`ALTER TABLE commerces ADD COLUMN \`${name}\` DATETIME NULL`);
+        }
       }
       // DDL is not transactional in MySQL; every step above is safe to resume.
       await query('INSERT INTO schema_migrations (version, applied_at) VALUES (?, NOW())', [version]);

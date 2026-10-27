@@ -1,3 +1,4 @@
+import { trialExpired } from '../billing/trial-policy';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Commerce } from '../database/models/commerce.model';
 import { BillingSubscription } from '../database/models/billing-subscription.model';
@@ -15,7 +16,7 @@ export class AdminPlanService {
     if (!Number.isSafeInteger(page) || page < 1 || page > 10000) {
       throw new BadRequestException('Página inválida');
     }
-    const commerce = await Commerce.findByPk(commerceId, { attributes: ['id', 'name', 'slug', 'active'] });
+    const commerce = await Commerce.findByPk(commerceId, { attributes: ['id', 'name', 'slug', 'active','trialStartedAt','trialEndsAt','trialConvertedAt'] });
     if (!commerce) throw new NotFoundException('Comercio no encontrado');
     const [subscription, history, lastPayment] = await Promise.all([
       BillingSubscription.findByPk(commerceId),
@@ -40,7 +41,11 @@ export class AdminPlanService {
     const checkoutUrl = canResume && subscription?.status === 'pending'
       ? safeSubscriptionCheckout(subscription.checkoutUrl) : null;
     return {
-      commerce: { id: commerce.id, name: commerce.name, slug: commerce.slug, active: commerce.active },
+      commerce: { id: commerce.id, name: commerce.name, slug: commerce.slug, active: commerce.active && !trialExpired(commerce) },
+      trial: commerce.trialEndsAt && !commerce.trialConvertedAt ? {
+        startedAt: commerce.trialStartedAt?.toISOString() ?? null, endsAt: commerce.trialEndsAt.toISOString(),
+        expired: trialExpired(commerce), daysLeft: Math.max(0, Math.ceil((commerce.trialEndsAt.getTime() - Date.now()) / 86400000)),
+      } : null,
       billingEnabled,
       paymentAction: {
         kind: canStart ? 'start' : canResume ? 'resume' : 'none',

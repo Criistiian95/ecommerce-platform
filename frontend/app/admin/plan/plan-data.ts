@@ -2,6 +2,7 @@ export type PlanPayment = { id: string; paymentReference: string; approvedAt: st
 export type MerchantPlan = {
   commerce: { id: string; name: string; slug: string; active: boolean };
   billingEnabled: boolean;
+  trial?: null | { startedAt: string | null; endsAt: string; expired: boolean; daysLeft: number };
   paymentAction: { kind: 'start' | 'resume' | 'none'; amountArs: number };
   subscription: null | {
     status: string; amountArs: number; currency: string; interval: string;
@@ -24,6 +25,12 @@ export function planDate(value: string | null, includeTime = false) {
 
 export function planPresentation(data: MerchantPlan, now = Date.now()) {
   const sub = data.subscription;
+  if (data.trial && !sub?.paidThrough) {
+    const daysLeft = Math.max(0, Math.ceil((Date.parse(data.trial.endsAt) - now) / 86400000));
+    return { label: daysLeft > 0 ? `Prueba gratis · ${daysLeft} día${daysLeft === 1 ? '' : 's'}` : 'Prueba finalizada',
+      tone: daysLeft > 3 ? 'success' : 'warning', daysLeft,
+      message: daysLeft > 0 ? 'Estás probando tu tienda sin tarjeta. Al terminar, elegí si querés activar el abono mensual. No se cobra automáticamente por iniciar la prueba.' : 'Terminó tu prueba. Tus datos se conservan y podés consultarlos. Activá el abono para volver a operar y recibir pedidos.' };
+  }
   if (!sub) return {
     label: 'Sin suscripción asociada', tone: 'neutral', daysLeft: null,
     message: 'Podés iniciar tu abono desde la tarjeta Pagar cuota. El importe corresponde a la primera cuota; no se te agrega deuda por períodos anteriores.',

@@ -1,3 +1,4 @@
+import { trialExpired } from '../billing/trial-policy';
 import { normalizeCartItems } from './cart-items';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Op } from 'sequelize';
@@ -10,9 +11,9 @@ export class PublicCartService {
   private async commerceId(slug: string) {
     const commerce = await Commerce.findOne({
       where: { slug, active: true },
-      attributes: ['id'],
+      attributes: ['id','trialEndsAt','trialConvertedAt'],
     });
-    if (!commerce) throw new NotFoundException('Comercio no encontrado');
+    if (!commerce || trialExpired(commerce)) throw new NotFoundException('Comercio no encontrado');
     return commerce.id;
   }
 

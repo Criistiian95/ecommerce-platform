@@ -194,7 +194,7 @@ export class BillingService {
     await BillingPayment.create({commerceId:locked.commerceId,mpInvoiceId:invoiceId,mpPaymentId:paymentId,approvedAt:approved},{transaction});
     const paidThrough=nextPaidThrough(locked.paidThrough,approved);
     await locked.update({status:'active',paidThrough,startedAt:locked.startedAt||approved},{transaction});
-    await Commerce.update({active:true},{where:{id:locked.commerceId},transaction});
+    await Commerce.update({active:true,trialConvertedAt:approved},{where:{id:locked.commerceId},transaction});
     return true;
   });
   return {processed:result};

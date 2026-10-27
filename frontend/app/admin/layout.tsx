@@ -2,6 +2,7 @@
 
 import { Fragment, type ReactNode, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import TrialNotice from './trial-notice';
 import { ADMIN_LOGOUT_EVENT, ADMIN_TOKEN_KEY } from './session';
 
 /** Hide cached admin views on logout, including other tabs on this origin. */
@@ -41,5 +42,5 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   if (!session.ready || !session.token) {
     return <main className="shell" role="status">{session.ready ? 'Volviendo al ingreso…' : 'Cargando panel…'}</main>;
   }
-  return <Fragment key={session.revision}>{children}</Fragment>;
+  return <Fragment key={session.revision}><TrialNotice />{children}</Fragment>;
 }

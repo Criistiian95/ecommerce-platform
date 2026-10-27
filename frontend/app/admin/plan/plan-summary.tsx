@@ -14,10 +14,11 @@ export default function PlanSummary() {
       <div className={styles.summaryCopy}>
         <strong>Mi plan</strong>
         <span>{loading ? 'Consultando tu suscripción…' : error ? 'No pudimos consultar el estado del plan.' : info?.label}</span>
+        {data?.trial && <small>Prueba hasta el {planDate(data.trial.endsAt, true)} · Sin cobro automático</small>}
         {data?.subscription?.paidThrough && <small>Período abonado hasta el {planDate(data.subscription.paidThrough)}</small>}
       </div>
       {info && <span className={`${styles.badge} ${styles[info.tone]}`}>{data?.commerce.active ? 'Tienda activa' : 'Tienda inactiva'}</span>}
-      <Link className={styles.summaryLink} href={offer ? '/admin/plan#pagar-cuota' : '/admin/plan'}>{offer ? `Pagar cuota · $${offer.amountArs.toLocaleString('es-AR')}` : 'Ver mi plan'} <span aria-hidden="true">→</span></Link>
+      <Link className={styles.summaryLink} href={offer ? '/admin/plan#pagar-cuota' : '/admin/plan'}>{data?.trial && !data.trial.expired ? 'Ver mi prueba' : offer ? `Pagar cuota · $${offer.amountArs.toLocaleString('es-AR')}` : 'Ver mi plan'} <span aria-hidden="true">→</span></Link>
     </section>
   );
 }

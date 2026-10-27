@@ -1,3 +1,4 @@
+import { newTrial, trialExpired } from '../billing/trial-policy';
 import {BillingService} from '../billing/billing.service';
 import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
@@ -97,7 +98,7 @@ export class AuthService {
     const commerce = await Commerce.findOne({
       where: { slug: input.commerceSlug?.trim().toLowerCase(), active: true },
     });
-    if (!commerce) throw new BadRequestException('Comercio no encontrado');
+    if (!commerce || trialExpired(commerce)) throw new BadRequestException('Comercio no encontrado');
 
     const name = input.name?.trim();
     const email = input.email?.trim().toLowerCase();
@@ -147,9 +148,9 @@ export class AuthService {
   async loginCustomer(commerceSlug: string, email: string, password: string) {
     const commerce = await Commerce.findOne({
       where: { slug: commerceSlug?.trim().toLowerCase(), active: true },
-      attributes: ['id'],
+      attributes: ['id','trialEndsAt','trialConvertedAt'],
     });
-    if (!commerce) throw new UnauthorizedException('Credenciales inválidas');
+    if (!commerce || trialExpired(commerce)) throw new UnauthorizedException('Credenciales inválidas');
 
     const user = await User.findOne({
       where: {
@@ -225,9 +226,9 @@ export class AuthService {
 
       const commerce = await Commerce.findOne({
         where: { slug: commerceSlug.trim().toLowerCase(), active: true },
-        attributes: ['id'],
+        attributes: ['id','trialEndsAt','trialConvertedAt'],
       });
-      if (!commerce || payload.commerceId !== commerce.id) return null;
+      if (!commerce || trialExpired(commerce) || payload.commerceId !== commerce.id) return null;
 
       return await User.findOne({
         where: {
@@ -254,19 +255,13 @@ export class AuthService {
     if(await Commerce.findOne({where:{slug},attributes:['id']})) throw new ConflictException('Ese identificador de tienda ya está en uso');
     const passwordHash=await bcrypt.hash(password,12);
     try {
-      const registered=await this.db.sequelize.transaction(async transaction=>{
-        const commerce=await Commerce.create({name,slug,active:process.env.BILLING_ENABLED!=='true'},{transaction});
+      const trial = newTrial();
+      await this.db.sequelize.transaction(async transaction=>{
+        const commerce=await Commerce.create({name,slug,active:true,...trial},{transaction});
         await User.create({commerceId:commerce.id,name:adminName,email,passwordHash,role:'admin',active:true},{transaction});
-        return {ok:true,commerce:{id:commerce.id,name,slug}};
       });
-      if(process.env.BILLING_ENABLED!=='true') return {ok:true,status:'active',commerce:{name,slug}};
-      // Mercado Pago is an external service. A failed checkout never activates the store.
-      try {
-        const checkout=await this.billing.createMerchantSubscription(registered.commerce.id,email);
-        return {ok:true,commerce:{name,slug},...checkout};
-      } catch {
-        return {ok:true,status:'pending_payment',commerce:{name,slug},message:'La tienda está registrada y pendiente de pago. Iniciá sesión para reintentar el checkout.'};
-      }
+      // No provider call or subscription is created until the owner explicitly activates a plan.
+      return {ok:true,status:'trial',commerce:{name,slug},trialEndsAt:trial.trialEndsAt.toISOString()};
     } catch(error) {
       if((error as Error).name==='SequelizeUniqueConstraintError') throw new ConflictException('Ese identificador de tienda ya está en uso');
       throw error;
