@@ -57,7 +57,7 @@ export class PlatformStatisticsService implements OnApplicationBootstrap, OnModu
   }
   onModuleDestroy() { if (this.timer) clearInterval(this.timer); }
 
-  async record(path: unknown, sessionId: unknown, userAgent = '', edgeIp?: string, browserId?: unknown, now = new Date()) {
+  async record(path: unknown, sessionId: unknown, userAgent = '', now = new Date(), edgeIp?: string, browserId?: unknown) {
     if (typeof path !== 'string' || !pages.has(path) || typeof sessionId !== 'string' ||
         !/^[a-f0-9]{32}$/.test(sessionId) || /bot|crawler|spider|headless|preview|slurp/i.test(userAgent)) return;
     const sessionHash = sessionDigest(sessionId);
