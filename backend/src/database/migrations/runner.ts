@@ -5,7 +5,7 @@ import { baseline } from './baseline';
 import { passwordRecoverySchema } from './password-recovery';
 
 type Query = (sql: string, values?: unknown[]) => Promise<any[]>;
-const versions = ['001_baseline', '002_legacy_checkout', '003_email_outbox', '004_customer_accounts', '005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font', '010_store_cover', '011_store_identity', '012_store_contact', '013_store_header', '014_platform_billing', '015_commerce_trial'];
+const versions = ['001_baseline', '002_legacy_checkout', '003_email_outbox', '004_customer_accounts', '005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font', '010_store_cover', '011_store_identity', '012_store_contact', '013_store_header', '014_platform_billing', '015_commerce_trial', '016_visits_and_registration_email'];
 async function legacy(query: Query) {
   const columns: Record<string, Record<string, string>> = {
     products: { image_data: 'MEDIUMBLOB NULL', image_mime_type: 'VARCHAR(60) NULL', brand: 'VARCHAR(120) NULL', cost: 'DECIMAL(14,2) NULL', offer_price: 'DECIMAL(14,2) NULL', published: 'TINYINT(1) NOT NULL DEFAULT 1', featured: 'TINYINT(1) NOT NULL DEFAULT 0' },
@@ -197,6 +197,33 @@ export async function runMigrations(sequelize: Sequelize) {
           if (!(await query('SHOW COLUMNS FROM commerces WHERE Field = ?', [name])).length)
             await query(`ALTER TABLE commerces ADD COLUMN \`${name}\` DATETIME NULL`);
         }
+      }
+      if (version === '016_visits_and_registration_email') {
+        await query(`CREATE TABLE IF NOT EXISTS store_visit_totals (
+          commerce_id CHAR(36) BINARY NOT NULL, visit_date DATE NOT NULL,
+          visits INT UNSIGNED NOT NULL DEFAULT 0,
+          PRIMARY KEY (commerce_id, visit_date),
+          FOREIGN KEY (commerce_id) REFERENCES commerces(id) ON DELETE CASCADE ON UPDATE CASCADE
+        ) ENGINE=InnoDB`);
+        await query(`CREATE TABLE IF NOT EXISTS store_visit_dedup (
+          commerce_id CHAR(36) BINARY NOT NULL, visit_date DATE NOT NULL,
+          visitor_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+          PRIMARY KEY (commerce_id, visit_date, visitor_hash),
+          INDEX ix_visit_dedup_date (visit_date),
+          FOREIGN KEY (commerce_id) REFERENCES commerces(id) ON DELETE CASCADE ON UPDATE CASCADE
+        ) ENGINE=InnoDB`);
+        await query(`CREATE TABLE IF NOT EXISTS registration_email_deliveries (
+          id CHAR(36) BINARY PRIMARY KEY, commerce_id CHAR(36) BINARY NOT NULL,
+          audience VARCHAR(20) NOT NULL, payload JSON NOT NULL, message MEDIUMTEXT NULL,
+          status VARCHAR(20) NOT NULL DEFAULT 'pending', attempts INT NOT NULL DEFAULT 0,
+          first_attempt_at DATETIME NULL, next_attempt_at DATETIME NOT NULL,
+          lease_until DATETIME NULL, lease_token CHAR(36) NULL, sent_at DATETIME NULL,
+          provider_message_id VARCHAR(150) NULL, last_error VARCHAR(100) NULL,
+          created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL,
+          UNIQUE KEY uq_registration_email_audience (commerce_id, audience),
+          INDEX ix_registration_email_due (status, next_attempt_at),
+          FOREIGN KEY (commerce_id) REFERENCES commerces(id) ON DELETE CASCADE ON UPDATE CASCADE
+        ) ENGINE=InnoDB`);
       }
       // DDL is not transactional in MySQL; every step above is safe to resume.
       await query('INSERT INTO schema_migrations (version, applied_at) VALUES (?, NOW())', [version]);

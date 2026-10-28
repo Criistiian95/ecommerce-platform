@@ -1,0 +1,37 @@
+import { DataTypes, Model, Sequelize } from 'sequelize';
+
+export class RegistrationEmailDelivery extends Model {
+  declare id: string;
+  declare commerceId: string;
+  declare audience: 'welcome' | 'platform';
+  declare payload: Record<string, any>;
+  declare message: string | null;
+  declare status: 'pending' | 'sending' | 'sent' | 'failed';
+  declare attempts: number;
+  declare firstAttemptAt: Date | null;
+  declare nextAttemptAt: Date;
+  declare leaseUntil: Date | null;
+  declare leaseToken: string | null;
+  declare sentAt: Date | null;
+  declare providerMessageId: string | null;
+  declare lastError: string | null;
+
+  static register(sequelize: Sequelize) {
+    RegistrationEmailDelivery.init({
+      id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+      commerceId: { type: DataTypes.UUID, allowNull: false, field: 'commerce_id' },
+      audience: { type: DataTypes.STRING(20), allowNull: false },
+      payload: { type: DataTypes.JSON, allowNull: false },
+      message: { type: DataTypes.TEXT('medium'), allowNull: true },
+      status: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'pending' },
+      attempts: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+      firstAttemptAt: { type: DataTypes.DATE, field: 'first_attempt_at' },
+      nextAttemptAt: { type: DataTypes.DATE, allowNull: false, field: 'next_attempt_at' },
+      leaseUntil: { type: DataTypes.DATE, field: 'lease_until' },
+      leaseToken: { type: DataTypes.STRING(36), field: 'lease_token' },
+      sentAt: { type: DataTypes.DATE, field: 'sent_at' },
+      providerMessageId: { type: DataTypes.STRING(150), field: 'provider_message_id' },
+      lastError: { type: DataTypes.STRING(100), field: 'last_error' },
+    }, { sequelize, modelName: 'RegistrationEmailDelivery', tableName: 'registration_email_deliveries', underscored: true });
+  }
+}
