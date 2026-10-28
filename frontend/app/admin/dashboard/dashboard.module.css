@@ -9,14 +9,11 @@
 :global(.dashboard-periods button.active){background:#fff;color:#245ce6;box-shadow:0 2px 8px rgba(23,34,56,.08)}
 :global(.dashboard-alert){display:flex;justify-content:space-between;gap:14px;align-items:center;margin-bottom:18px;padding:13px 15px;border:1px solid #efc7c7;border-radius:11px;background:#fff5f5;color:#8d2b2b}
 :global(.dashboard-alert button){border:0;background:transparent;text-decoration:underline;cursor:pointer;color:inherit;font-weight:800}
-:global(.dashboard-metrics){display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px}
+:global(.dashboard-metrics){display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
 :global(.dashboard-metric-card){background:#fff;border:1px solid #dfe5ef;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:7px;box-shadow:0 6px 18px rgba(23,34,56,.025)}
 :global(.dashboard-metric-card>span){font-size:12px;color:#667085;font-weight:650}
 :global(.dashboard-metric-card>strong){font-size:30px;letter-spacing:-.04em}
 :global(.dashboard-metric-card small){font-size:11px;font-weight:750}
-:global(.dashboard-visits-card){border-color:#b5e8d8;background:#f3fbf8}
-:global(.dashboard-visits-card>strong){color:#087b61}
-:global(.dashboard-visits-card small){color:#526c65;font-weight:600;line-height:1.4}
 :global(.positive){color:#28704a}
 :global(.negative){color:#a03a3a}
 :global(.dashboard-secondary-metrics){display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:12px}

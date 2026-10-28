@@ -6,7 +6,6 @@ import { PublicCartService } from './public-cart.service';
 import { PublicCheckoutService } from './public-checkout.service';
 import { MercadoPagoService } from './mercado-pago.service';
 import { AuthService } from '../auth/auth.service';
-import { StoreVisitsService } from './store-visits.service';
 
 @Controller('catalog')
 export class CatalogPublicController {
@@ -17,18 +16,11 @@ export class CatalogPublicController {
     private readonly publicCheckout: PublicCheckoutService,
     private readonly mercadoPago: MercadoPagoService,
     private readonly authService: AuthService,
-    private readonly visits: StoreVisitsService,
   ) {}
 
   @Get('store/:slug')
   storefront(@Param('slug') slug: string) {
     return this.publicCatalog.getCatalog(slug);
-  }
-
-  @Post('store/:slug/visit')
-  @HttpCode(204)
-  async recordVisit(@Param('slug') slug: string, @Body() body: { visitorId?: unknown }, @Headers('user-agent') userAgent = '') {
-    await this.visits.record(slug, body?.visitorId, userAgent);
   }
 
   @Get('store/:slug/cover')

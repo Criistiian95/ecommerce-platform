@@ -2,6 +2,7 @@ import './globals.css';
 import { headers } from 'next/headers';
 import { StorefrontProvider } from './storefront-context';
 import { tenantSlugFromHost } from './tenant-host';
+import PlatformVisitTracker from './platform-visit-tracker';
 
 export const metadata = {
   title: 'Diseñolys | Tu tienda online, con tu identidad',
@@ -13,7 +14,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const domainSlug = tenantSlugFromHost(host);
   return (
     <html lang="es">
-      <body><StorefrontProvider domainSlug={domainSlug}>{children}</StorefrontProvider></body>
+      <body><PlatformVisitTracker tenantDomain={Boolean(domainSlug)} /><StorefrontProvider domainSlug={domainSlug}>{children}</StorefrontProvider></body>
     </html>
   );
 }

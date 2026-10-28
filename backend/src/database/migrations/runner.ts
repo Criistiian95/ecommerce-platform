@@ -5,7 +5,7 @@ import { baseline } from './baseline';
 import { passwordRecoverySchema } from './password-recovery';
 
 type Query = (sql: string, values?: unknown[]) => Promise<any[]>;
-const versions = ['001_baseline', '002_legacy_checkout', '003_email_outbox', '004_customer_accounts', '005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font', '010_store_cover', '011_store_identity', '012_store_contact', '013_store_header', '014_platform_billing', '015_commerce_trial', '016_visits_and_registration_email'];
+const versions = ['001_baseline', '002_legacy_checkout', '003_email_outbox', '004_customer_accounts', '005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font', '010_store_cover', '011_store_identity', '012_store_contact', '013_store_header', '014_platform_billing', '015_commerce_trial', '016_visits_and_registration_email', '017_platform_statistics'];
 async function legacy(query: Query) {
   const columns: Record<string, Record<string, string>> = {
     products: { image_data: 'MEDIUMBLOB NULL', image_mime_type: 'VARCHAR(60) NULL', brand: 'VARCHAR(120) NULL', cost: 'DECIMAL(14,2) NULL', offer_price: 'DECIMAL(14,2) NULL', published: 'TINYINT(1) NOT NULL DEFAULT 1', featured: 'TINYINT(1) NOT NULL DEFAULT 0' },
@@ -223,6 +223,23 @@ export async function runMigrations(sequelize: Sequelize) {
           UNIQUE KEY uq_registration_email_audience (commerce_id, audience),
           INDEX ix_registration_email_due (status, next_attempt_at),
           FOREIGN KEY (commerce_id) REFERENCES commerces(id) ON DELETE CASCADE ON UPDATE CASCADE
+        ) ENGINE=InnoDB`);
+      }
+      if (version === '017_platform_statistics') {
+        await query(`CREATE TABLE IF NOT EXISTS platform_visit_totals (
+          visit_date DATE PRIMARY KEY, page_views INT UNSIGNED NOT NULL DEFAULT 0,
+          sessions INT UNSIGNED NOT NULL DEFAULT 0, register_views INT UNSIGNED NOT NULL DEFAULT 0
+        ) ENGINE=InnoDB`);
+        await query(`CREATE TABLE IF NOT EXISTS platform_session_dedup (
+          session_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,
+          started_at DATETIME NOT NULL, INDEX ix_platform_session_started (started_at)
+        ) ENGINE=InnoDB`);
+        await query(`CREATE TABLE IF NOT EXISTS platform_owner_codes (
+          id CHAR(36) BINARY PRIMARY KEY, sequence BIGINT UNSIGNED NOT NULL AUTO_INCREMENT UNIQUE,
+          code_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+          attempts INT UNSIGNED NOT NULL DEFAULT 0, expires_at DATETIME NOT NULL,
+          used_at DATETIME NULL, created_at DATETIME(3) NOT NULL,
+          INDEX ix_platform_owner_created (created_at)
         ) ENGINE=InnoDB`);
       }
       // DDL is not transactional in MySQL; every step above is safe to resume.
