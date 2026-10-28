@@ -7,6 +7,7 @@ import { isPlatformVisit } from './platform-visit-path';
 
 const SESSION_KEY = 'disenolys-platform-session';
 const SESSION_TIMEOUT = 30 * 60_000;
+const BROWSER_KEY = 'disenolys-platform-browser-id';
 
 export default function PlatformVisitTracker({ tenantDomain }: { tenantDomain: boolean }) {
   const path = usePathname();
@@ -25,10 +26,12 @@ export default function PlatformVisitTracker({ tenantDomain }: { tenantDomain: b
         crypto.getRandomValues(bytes);
         session.id = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
       }
+      let browserId = localStorage.getItem(BROWSER_KEY) || '';
+      if (!/^[a-f0-9]{32}$/.test(browserId)) { const bytes = new Uint8Array(16); crypto.getRandomValues(bytes); browserId = Array.from(bytes, byte => byte.toString(16).padStart(2,'0')).join(''); localStorage.setItem(BROWSER_KEY, browserId); }
       session.last = now;
       localStorage.setItem(SESSION_KEY, JSON.stringify(session));
       void fetch(`${API_URL}/platform/visit`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path, sessionId: session.id }), keepalive: true }).catch(() => {});
+        body: JSON.stringify({ path, sessionId: session.id, browserId }), keepalive: true }).catch(() => {});
     } catch { /* Analytics never blocks the page. */ }
   }, [path, tenantDomain]);
   return null;
