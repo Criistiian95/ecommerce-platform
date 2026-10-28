@@ -64,7 +64,7 @@ test('MySQL: versioned legacy upgrade is repeatable and startup is read-only', a
   await db.onModuleInit();
   assert.equal(statements.some(sql => /ALTER|CREATE|DROP/i.test(sql)), false);
   const [versions] = await original('SELECT version FROM schema_migrations');
-  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font', '010_store_cover', '011_store_identity', '012_store_contact', '013_store_header', '014_platform_billing', '015_commerce_trial', '016_visits_and_registration_email', '017_platform_statistics']);
+  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font', '010_store_cover', '011_store_identity', '012_store_contact', '013_store_header', '014_platform_billing', '015_commerce_trial', '016_visits_and_registration_email', '017_platform_statistics', '018_platform_traffic_filter']);
   const [indexes] = await db.sequelize.query("SHOW INDEX FROM orders WHERE Column_name = 'checkout_key'");
   assert.ok(indexes.some(index => index.Non_unique === 0));
 });
