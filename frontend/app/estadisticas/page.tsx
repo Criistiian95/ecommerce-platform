@@ -62,19 +62,17 @@ export default function StatisticsPage() {
     if (!token || busy) return;
     setBusy(true); setError('');
     try {
-      const key = 'disenolys-platform-session';
-      let entry: {id?: string; last?: number} = {};
-      try { entry = JSON.parse(localStorage.getItem(key) || '{}'); } catch {}
-      if (!entry.id || !/^[a-f0-9]{32}$/.test(entry.id)) {
+      const key = 'disenolys-platform-browser-id';
+      let browserId = localStorage.getItem(key) || '';
+      if (!/^[a-f0-9]{32}$/.test(browserId)) {
         const bytes = new Uint8Array(16);
         crypto.getRandomValues(bytes);
-        entry.id = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+        browserId = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+        localStorage.setItem(key, browserId);
       }
-      entry.last = Date.now();
-      localStorage.setItem(key, JSON.stringify(entry));
       const response = await fetch(API_URL + '/platform/owner/exclude', {
         method: 'POST', headers: {'Authorization':'Bearer ' + token, 'Content-Type':'application/json'},
-        body: JSON.stringify({sessionId:entry.id})
+        body: JSON.stringify({sessionId:browserId})
       });
       if (!response.ok) throw new Error('No se pudo activar la exclusión.');
       await load(token, period);
