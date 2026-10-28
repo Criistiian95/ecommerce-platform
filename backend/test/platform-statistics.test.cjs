@@ -58,7 +58,10 @@ test('owner exclusion creates one baseline and never erases historical visitor t
     },
   }};
   const stats = new PlatformStatisticsService(db);
+  const previous = process.env.JWT_SECRET;
+  process.env.JWT_SECRET = 'mock-test-secret';
   const result = await stats.excludeOwner('a'.repeat(32), '8.8.8.8', new Date('2026-10-28T12:00:00.000Z'));
+  if (previous === undefined) delete process.env.JWT_SECRET; else process.env.JWT_SECRET = previous;
   assert.equal(result.active, true);
   assert.equal(result.ipExcluded, true);
   assert.ok(executed.some(sql => sql.includes('INSERT INTO platform_traffic_filter')));
