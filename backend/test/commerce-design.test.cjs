@@ -2,6 +2,7 @@ const {test,afterEach,mock}=require('node:test');
 const assert=require('node:assert/strict');
 const {Commerce}=require('../dist/database/models/commerce.model');
 const {User}=require('../dist/database/models/user.model');
+const {RegistrationEmailDelivery}=require('../dist/database/models/registration-email-delivery.model');
 const {AdminCommerceSettingsService}=require('../dist/catalog/admin-commerce-settings.service');
 const {AuthService}=require('../dist/auth/auth.service');
 afterEach(()=>mock.restoreAll());
@@ -22,6 +23,7 @@ test('merchant registration validates reserved slugs and credentials before data
 test('registration creates owner and commerce in one transaction and ignores supplied role and tenant',async()=>{
  const transaction={test:true};mock.method(Commerce,'findOne',async()=>null);mock.method(Commerce,'create',async(data,options)=>{assert.equal(options.transaction,transaction);assert.equal(data.slug,'new-shop');return {id:'new-id',...data}});
  mock.method(User,'create',async(data,options)=>{assert.equal(options.transaction,transaction);assert.equal(data.commerceId,'new-id');assert.equal(data.role,'admin');assert.equal(data.email,'owner@example.com');assert.notEqual(data.passwordHash,input.password)});
+ mock.method(RegistrationEmailDelivery,'bulkCreate',async(rows,options)=>{assert.equal(options.transaction,transaction);assert.deepEqual(rows.map(row=>row.audience),['welcome','platform']);assert.ok(rows.every(row=>row.commerceId==='new-id'&&!JSON.stringify(row).includes(input.password)))});
  const svc=new AuthService({sequelize:{transaction:async cb=>cb(transaction)}});const result=await svc.registerCommerce({...input,role:'superadmin',commerceId:'other'});assert.equal(result.commerce.slug,'new-shop');assert.equal(result.token,undefined);
 });
 test('registration reports duplicate slug without attaching an owner to another commerce',async()=>{

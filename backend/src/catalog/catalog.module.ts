@@ -27,10 +27,11 @@ import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { AdminPlanController } from './admin-plan.controller';
 import { AdminPlanService } from './admin-plan.service';
+import { StoreVisitsService } from './store-visits.service';
 
 @Module({
   imports: [AuthModule, BillingModule],
   controllers: [MpConnectionController, CatalogController, CatalogPublicController, AdminOrdersController, AdminCustomersController, CustomerAccountController, AdminDashboardController, AdminCommerceSettingsController, AdminPlanController],
-  providers: [MpConnectionService, OrderEmailWorker, ReservationWorker, CatalogService, PublicCatalogService, PublicCartService, PublicCheckoutService, OrderEmailService, MercadoPagoService, AdminOrdersService, AdminCustomersService, CustomerAccountService, AdminDashboardService, AdminCommerceSettingsService, AdminPlanService, AuthGuard, RolesGuard],
+  providers: [StoreVisitsService, MpConnectionService, OrderEmailWorker, ReservationWorker, CatalogService, PublicCatalogService, PublicCartService, PublicCheckoutService, OrderEmailService, MercadoPagoService, AdminOrdersService, AdminCustomersService, CustomerAccountService, AdminDashboardService, AdminCommerceSettingsService, AdminPlanService, AuthGuard, RolesGuard],
 })
 export class CatalogModule {}

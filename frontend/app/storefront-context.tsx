@@ -6,6 +6,7 @@ import { COMMERCE_SLUG } from './storefront-config';
 import { CartProvider } from './cart-context';
 import { CustomerAuthProvider } from './customer-auth-context';
 import { CommerceThemeProvider } from './commerce-theme-provider';
+import StoreVisitTracker from './store-visit-tracker';
 
 type Store = { slug: string; isTenantDomain: boolean; path: (href: string) => string };
 const Context = createContext<Store>({ slug: COMMERCE_SLUG, isTenantDomain: false, path: href => href });
@@ -17,6 +18,6 @@ export function StorefrontProvider({ children, domainSlug }: { children: React.R
     isTenantDomain: Boolean(domainSlug),
     path: (href: string) => storePath(params.slug, href, Boolean(domainSlug)),
   }), [slug, params.slug, domainSlug]);
-  return <Context.Provider value={value}><CommerceThemeProvider key={slug}><CustomerAuthProvider key={slug}><CartProvider key={slug}>{children}</CartProvider></CustomerAuthProvider></CommerceThemeProvider></Context.Provider>;
+  return <Context.Provider value={value}><StoreVisitTracker slug={slug} tenantDomain={Boolean(domainSlug)} /><CommerceThemeProvider key={slug}><CustomerAuthProvider key={slug}><CartProvider key={slug}>{children}</CartProvider></CustomerAuthProvider></CommerceThemeProvider></Context.Provider>;
 }
 export function useStorefront() { return useContext(Context); }

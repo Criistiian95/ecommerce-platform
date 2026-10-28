@@ -5,6 +5,7 @@ const { AuthService } = require('../dist/auth/auth.service');
 const { AuthGuard } = require('../dist/auth/auth.guard');
 const { Commerce } = require('../dist/database/models/commerce.model');
 const { User } = require('../dist/database/models/user.model');
+const { RegistrationEmailDelivery } = require('../dist/database/models/registration-email-delivery.model');
 const { Session } = require('../dist/database/models/session.model');
 const { PublicCartService } = require('../dist/catalog/public-cart.service');
 const { PublicCheckoutService } = require('../dist/catalog/public-checkout.service');
@@ -23,6 +24,7 @@ test('registration grants a server-timed trial atomically without invoking payme
   mock.method(Commerce, 'findOne', async () => null);
   mock.method(Commerce, 'create', async (data, options) => {assert.equal(options.transaction,transaction);created=data;return {id:'trial-store',...data};});
   mock.method(User, 'create', async (data,options) => {assert.equal(options.transaction,transaction);assert.equal(data.commerceId,'trial-store');assert.equal(data.role,'admin');});
+  mock.method(RegistrationEmailDelivery, 'bulkCreate', async (rows,options) => {assert.equal(options.transaction,transaction);assert.deepEqual(rows.map(row=>row.audience),['welcome','platform']);});
   const service = new AuthService({sequelize:{transaction:async cb=>cb(transaction)}}, {createMerchantSubscription:()=>assert.fail('No payment at signup')});
   const result = await service.registerCommerce({commerceName:'Test',commerceSlug:'trial-shop',adminName:'Owner',email:'a@example.com',password:'long-password',active:false,trialEndsAt:'2099-01-01',role:'superadmin'});
   assert.equal(result.status,'trial'); assert.equal(created.active,true);

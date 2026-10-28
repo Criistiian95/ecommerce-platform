@@ -11,6 +11,7 @@ import { User } from '../database/models/user.model';
 import { Session } from '../database/models/session.model';
 import { Commerce } from '../database/models/commerce.model';
 import { Order } from '../database/models/order.model';
+import { RegistrationEmailDelivery } from '../database/models/registration-email-delivery.model';
 
 @Injectable()
 export class AuthService {
@@ -259,6 +260,11 @@ export class AuthService {
       await this.db.sequelize.transaction(async transaction=>{
         const commerce=await Commerce.create({name,slug,active:true,...trial},{transaction});
         await User.create({commerceId:commerce.id,name:adminName,email,passwordHash,role:'admin',active:true},{transaction});
+        const payload = { commerceName: name, slug, adminName, email, trialEndsAt: trial.trialEndsAt.toISOString() };
+        await RegistrationEmailDelivery.bulkCreate([
+          { commerceId: commerce.id, audience: 'welcome', payload, nextAttemptAt: new Date() },
+          { commerceId: commerce.id, audience: 'platform', payload, nextAttemptAt: new Date() },
+        ], { transaction });
       });
       // No provider call or subscription is created until the owner explicitly activates a plan.
       return {ok:true,status:'trial',commerce:{name,slug},trialEndsAt:trial.trialEndsAt.toISOString()};

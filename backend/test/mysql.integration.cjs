@@ -64,7 +64,7 @@ test('MySQL: versioned legacy upgrade is repeatable and startup is read-only', a
   await db.onModuleInit();
   assert.equal(statements.some(sql => /ALTER|CREATE|DROP/i.test(sql)), false);
   const [versions] = await original('SELECT version FROM schema_migrations');
-  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font', '010_store_cover', '011_store_identity', '012_store_contact', '013_store_header', '014_platform_billing', '015_commerce_trial']);
+  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font', '010_store_cover', '011_store_identity', '012_store_contact', '013_store_header', '014_platform_billing', '015_commerce_trial', '016_visits_and_registration_email']);
   const [indexes] = await db.sequelize.query("SHOW INDEX FROM orders WHERE Column_name = 'checkout_key'");
   assert.ok(indexes.some(index => index.Non_unique === 0));
 });
@@ -432,9 +432,41 @@ test('MySQL merchant registration: one owner on concurrent registration and roll
  assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
  const commerce=await Commerce.findOne({where:{slug:input.commerceSlug}});
  assert.equal(await User.count({where:{commerceId:commerce.id,role:'admin'}}),1);
+ const {RegistrationEmailDelivery}=require('../dist/database/models/registration-email-delivery.model');
+ const emails=await RegistrationEmailDelivery.findAll({where:{commerceId:commerce.id},order:[['audience','ASC']]});
+ assert.deepEqual(emails.map(row=>row.audience),['platform','welcome']);
+ assert.ok(emails.every(row=>row.status==='pending'&&row.payload.email===input.email&&!JSON.stringify(row.payload).includes(input.password)));
  const failedSlug=randomUUID();mock.method(User,'create',async()=>{throw new Error('owner insertion failed')});
  await assert.rejects(()=>auth.registerCommerce({...input,commerceSlug:failedSlug}),/owner insertion failed/);
  assert.equal(await Commerce.count({where:{slug:failedSlug}}),0);
+});
+test('MySQL visits: same browser is counted once per day and store, including concurrent requests', async () => {
+  const {StoreVisitsService}=require('../dist/catalog/store-visits.service');
+  const a=await fixture(),b=await fixture(),visits=new StoreVisitsService(db);
+  const browser='a'.repeat(32), another='b'.repeat(32);
+  const beforeMidnight=new Date('2026-10-28T02:59:00Z'), nextDay=new Date('2026-10-28T03:01:00Z');
+  await Promise.all(Array.from({length:5},()=>visits.record(a.commerce.slug,browser,'human',beforeMidnight)));
+  await visits.record(a.commerce.slug,another,'human',beforeMidnight);
+  await visits.record(a.commerce.slug,browser,'human',nextDay);
+  await visits.record(b.commerce.slug,browser,'human',nextDay);
+  await visits.record(a.commerce.slug,'not-an-id','human',nextDay);
+  await visits.record(a.commerce.slug,'c'.repeat(32),'Googlebot',nextDay);
+  assert.equal(await visits.periodTotal(a.commerce.id,7,nextDay),3);
+  assert.equal(await visits.periodTotal(b.commerce.id,7,nextDay),1);
+  const [hashes]=await db.sequelize.query('SELECT visitor_hash FROM store_visit_dedup WHERE commerce_id = :id', {replacements:{id:a.commerce.id}});
+  assert.equal(hashes.length,3);assert.ok(hashes.every(row=>!row.visitor_hash.includes(browser)));
+  await visits.clean(new Date('2026-10-31T04:00:00Z'));
+  const [remaining]=await db.sequelize.query('SELECT visitor_hash FROM store_visit_dedup WHERE commerce_id = :id', {replacements:{id:a.commerce.id}});
+  assert.equal(remaining.length,0);
+  assert.equal(await visits.periodTotal(a.commerce.id,7,new Date('2026-10-31T04:00:00Z')),3);
+});
+test('MySQL registration rolls back the new store if the notification jobs cannot be persisted', async () => {
+  const {AuthService}=require('../dist/auth/auth.service');
+  const {RegistrationEmailDelivery}=require('../dist/database/models/registration-email-delivery.model');
+  const slug='fail-'+randomUUID();
+  mock.method(RegistrationEmailDelivery,'bulkCreate',async()=>{throw new Error('notification storage failed')});
+  await assert.rejects(new AuthService(db).registerCommerce({commerceName:'Trial',commerceSlug:slug,adminName:'Owner',email:'owner@example.com',password:'long-test-password'}),/notification storage failed/);
+  assert.equal(await Commerce.count({where:{slug}}),0);
 });
 test('MySQL design: branding and logo persist to the public catalog of only the owning commerce',async()=>{
  const {AdminCommerceSettingsService}=require('../dist/catalog/admin-commerce-settings.service');

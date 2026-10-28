@@ -3,6 +3,7 @@ import {BillingPayment} from './models/billing-payment.model';
 import { MpConnection, MpOAuthState } from './models/mp-connection.model';
 import { assertMigrationsCurrent } from './migrations/runner';
 import { OrderEmailDelivery } from './models/order-email-delivery.model';
+import { RegistrationEmailDelivery } from './models/registration-email-delivery.model';
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { Sequelize } from 'sequelize';
@@ -51,6 +52,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     Order.register(this.sequelize);
     OrderItem.register(this.sequelize);
     OrderEmailDelivery.register(this.sequelize);
+    RegistrationEmailDelivery.register(this.sequelize);
 
     Commerce.hasMany(User, { foreignKey: 'commerceId', as: 'users' });
     User.belongsTo(Commerce, { foreignKey: 'commerceId', as: 'commerce' });
