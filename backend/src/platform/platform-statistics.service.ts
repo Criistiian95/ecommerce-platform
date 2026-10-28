@@ -57,17 +57,18 @@ export class PlatformStatisticsService implements OnApplicationBootstrap, OnModu
   }
   onModuleDestroy() { if (this.timer) clearInterval(this.timer); }
 
-  async record(path: unknown, sessionId: unknown, userAgent = '', edgeIp?: string, now = new Date()) {
+  async record(path: unknown, sessionId: unknown, userAgent = '', edgeIp?: string, browserId?: unknown, now = new Date()) {
     if (typeof path !== 'string' || !pages.has(path) || typeof sessionId !== 'string' ||
         !/^[a-f0-9]{32}$/.test(sessionId) || /bot|crawler|spider|headless|preview|slurp/i.test(userAgent)) return;
     const sessionHash = sessionDigest(sessionId);
     const addressHash = ipDigest(edgeIp);
+    const browserHash = typeof browserId === 'string' && /^[a-f0-9]{32}$/.test(browserId) ? sessionDigest(browserId) : sessionHash;
     const day = argentinaDay(now);
     await this.db.sequelize.transaction(async transaction => {
       const [filter] = await this.db.sequelize.query<FilterRow>(
         'SELECT ip_hash, browser_hash FROM platform_traffic_filter WHERE id=1',
         { type: QueryTypes.SELECT, transaction });
-      if (excludedVisitor(filter, sessionHash, addressHash)) return;
+      if (excludedVisitor(filter, browserHash, addressHash)) return;
       await this.db.sequelize.query('INSERT IGNORE INTO platform_session_dedup(session_hash, started_at) VALUES (:hash, :now)',
         { replacements: { hash: sessionHash, now }, transaction });
       const [row] = await this.db.sequelize.query<{ inserted: number }>('SELECT ROW_COUNT() AS inserted', { type: QueryTypes.SELECT, transaction });
