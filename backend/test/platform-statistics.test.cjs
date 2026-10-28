@@ -32,3 +32,38 @@ test('the statistics endpoint requires the platform owner guard', () => {
   const guards = Reflect.getMetadata(GUARDS_METADATA, PlatformController.prototype.statistics);
   assert.ok(guards.includes(PlatformOwnerGuard));
 });
+
+test('owner filter excludes the chosen browser and safely handles IP fallback', () => {
+  const { excludedVisitor, publicIp } = require('../dist/platform/platform-statistics.service');
+  const filter = { browser_hash: 'browser', ip_hash: 'address' };
+  assert.equal(excludedVisitor(filter, 'browser', null), true);
+  assert.equal(excludedVisitor(filter, 'other', 'address'), true);
+  assert.equal(excludedVisitor(filter, 'other', 'different'), false);
+  assert.equal(excludedVisitor(undefined, 'browser', 'address'), false);
+  assert.equal(publicIp('192.168.1.1'), null);
+  assert.equal(publicIp('127.0.0.1'), null);
+  assert.equal(publicIp('8.8.8.8'), '8.8.8.8');
+  assert.equal(publicIp('malformed-ip'), null);
+});
+
+test('owner exclusion creates one baseline and never erases historical visitor totals', async () => {
+  const executed = [];
+  const db = { sequelize: {
+    transaction: async cb => cb({}),
+    query: async (sql) => {
+      executed.push(sql);
+      if (sql.includes('SELECT * FROM platform_traffic_filter')) return [];
+      if (sql.includes('SELECT page_views')) return [{ page_views: 18, sessions: 7, register_views: 3 }];
+      return [];
+    },
+  }};
+  const stats = new PlatformStatisticsService(db);
+  const previous = process.env.JWT_SECRET;
+  process.env.JWT_SECRET = 'mock-test-secret';
+  const result = await stats.excludeOwner('a'.repeat(32), '8.8.8.8', new Date('2026-10-28T12:00:00.000Z'));
+  if (previous === undefined) delete process.env.JWT_SECRET; else process.env.JWT_SECRET = previous;
+  assert.equal(result.active, true);
+  assert.equal(result.ipExcluded, true);
+  assert.ok(executed.some(sql => sql.includes('INSERT INTO platform_traffic_filter')));
+  assert.ok(!executed.some(sql => /DELETE FROM platform_visit_totals/i.test(sql)));
+});
