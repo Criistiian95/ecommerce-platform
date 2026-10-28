@@ -14,8 +14,8 @@ export class PlatformOwnerGuard implements CanActivate {
 export class PlatformController {
   constructor(private readonly stats: PlatformStatisticsService, private readonly owner: PlatformOwnerService) {}
   @Post('visit') @HttpCode(204)
-  async visit(@Body() body: { path?: unknown; sessionId?: unknown }, @Headers('user-agent') agent = '', @Req() req: Request) {
-    await this.stats.record(body?.path, body?.sessionId, agent, req.ip);
+  async visit(@Body() body: { path?: unknown; sessionId?: unknown; browserId?: unknown }, @Headers('user-agent') agent = '', @Req() req: Request) {
+    await this.stats.record(body?.path, body?.sessionId, agent, req.ip, body?.browserId);
   }
   @Post('owner/code') @HttpCode(200)
   requestCode() { return this.owner.requestCode(); }
