@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { API_URL } from '../storefront-types';
 import styles from './statistics.module.css';
 
-type Data = { visits: number; sessions: number; registrationViews: number; storesCreated: number };
+type Data = { visits: number; sessions: number; registrationViews: number; storesCreated: number; filteredSince?: string | null; ipExcluded?: boolean };
 const TOKEN_KEY = 'disenolys-owner-statistics';
 const periods = [{ value: '7', label: '7 días' }, { value: '30', label: '30 días' },
   { value: '90', label: '90 días' }, { value: 'all', label: 'Todo' }];
@@ -58,6 +58,29 @@ export default function StatisticsPage() {
     } catch (e) { setError(e instanceof Error ? e.message : 'No pudimos verificar el código.'); }
     finally { setBusy(false); }
   }
+  async function excludeOwnTraffic() {
+    if (!token || busy) return;
+    setBusy(true); setError('');
+    try {
+      const key = 'disenolys-platform-session';
+      let entry: {id?: string; last?: number} = {};
+      try { entry = JSON.parse(localStorage.getItem(key) || '{}'); } catch {}
+      if (!entry.id || !/^[a-f0-9]{32}$/.test(entry.id)) {
+        const bytes = new Uint8Array(16);
+        crypto.getRandomValues(bytes);
+        entry.id = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+      }
+      entry.last = Date.now();
+      localStorage.setItem(key, JSON.stringify(entry));
+      const response = await fetch(API_URL + '/platform/owner/exclude', {
+        method: 'POST', headers: {'Authorization':'Bearer ' + token, 'Content-Type':'application/json'},
+        body: JSON.stringify({sessionId:entry.id})
+      });
+      if (!response.ok) throw new Error('No se pudo activar la exclusión.');
+      await load(token, period);
+    } catch (e) { setError(e instanceof Error ? e.message : 'No se pudo excluir este navegador.'); }
+    finally { setBusy(false); }
+  }
   function logout() { requestId.current++; try { sessionStorage.removeItem(TOKEN_KEY); } catch {} setToken(''); setData(null); setRequested(false); }
 
   return <main className={styles.page}>
@@ -80,7 +103,13 @@ export default function StatisticsPage() {
               ['04', 'Tiendas creadas', data?.storesCreated, 'Altas hechas desde la página'],
             ].map(([number, label, value, detail]) => <article className={styles.metric} key={String(number)}><span className={styles.metricNumber}>{number}</span><h3>{label}</h3><strong>{typeof value === 'number' ? value.toLocaleString('es-AR') : '—'}</strong><p>{detail}</p></article>)}
           </section>
-          <div className={styles.note}><strong>Cómo leer estos datos</strong><p>Las visitas cuentan las páginas abiertas, incluidas las recargas. Una sesión reúne la actividad de un navegador hasta 30 minutos de inactividad. Son estimaciones: pueden incluir tus propias visitas. Las visitas comienzan a contarse desde la activación; las altas de tiendas incluyen registros anteriores.</p></div>
+          <div className={styles.note}>
+            <strong>Excluir mis visitas</strong>
+            <p>{data?.filteredSince ? 'Tráfico filtrado desde ' + new Date(data.filteredSince).toLocaleString('es-AR') + '. Este navegador está marcado como propio; la IP se excluye solo si Render permite identificarla.' : 'Tus propias pruebas pueden estar incluidas. Activá la exclusión desde este navegador y esta conexión para medir las próximas visitas sin contar las tuyas.'}</p>
+            <p>{data?.filteredSince ? (data.ipExcluded ? 'Filtro de IP activo.' : 'Filtro de navegador activo; IP no identificable con seguridad.') : 'No se puede separar con precisión tu tráfico anterior de las visitas de clientes: al activar el filtro empezará un período nuevo, sin borrar registros históricos.'}</p>
+            <button type="button" disabled={busy} onClick={() => void excludeOwnTraffic()}>{busy ? 'Aplicando…' : data?.filteredSince ? 'Actualizar exclusión de este navegador' : 'Excluir este navegador y mi IP'}</button>
+          </div>
+          <div className={styles.note}><strong>Cómo leer estos datos</strong><p>Las visitas cuentan las páginas abiertas, incluidas las recargas. Una sesión reúne la actividad de un navegador hasta 30 minutos de inactividad. Son estimaciones: antes de activar la exclusión pueden incluir tus visitas; después solo se excluye el navegador y la IP identificable. Las IP compartidas pueden ocultar otras visitas. Las visitas comienzan a contarse desde la activación; las altas de tiendas incluyen registros anteriores.</p></div>
         </>}
     </div>
   </main>;
