@@ -64,7 +64,7 @@ test('MySQL: versioned legacy upgrade is repeatable and startup is read-only', a
   await db.onModuleInit();
   assert.equal(statements.some(sql => /ALTER|CREATE|DROP/i.test(sql)), false);
   const [versions] = await original('SELECT version FROM schema_migrations');
-  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font', '010_store_cover', '011_store_identity', '012_store_contact', '013_store_header', '014_platform_billing', '015_commerce_trial', '016_visits_and_registration_email']);
+  assert.deepEqual(versions.map(row => row.version).sort(), ['001_baseline','002_legacy_checkout','003_email_outbox','004_customer_accounts','005_commerce_branding', '006_commerce_payments', '007_password_recovery', '008_merchant_email', '009_store_font', '010_store_cover', '011_store_identity', '012_store_contact', '013_store_header', '014_platform_billing', '015_commerce_trial', '016_visits_and_registration_email', '017_platform_statistics']);
   const [indexes] = await db.sequelize.query("SHOW INDEX FROM orders WHERE Column_name = 'checkout_key'");
   assert.ok(indexes.some(index => index.Non_unique === 0));
 });
@@ -467,6 +467,56 @@ test('MySQL registration rolls back the new store if the notification jobs canno
   mock.method(RegistrationEmailDelivery,'bulkCreate',async()=>{throw new Error('notification storage failed')});
   await assert.rejects(new AuthService(db).registerCommerce({commerceName:'Trial',commerceSlug:slug,adminName:'Owner',email:'owner@example.com',password:'long-test-password'}),/notification storage failed/);
   assert.equal(await Commerce.count({where:{slug}}),0);
+});
+test('MySQL platform statistics count pageviews, registration views and sessions separately', async () => {
+  const {PlatformStatisticsService} = require('../dist/platform/platform-statistics.service');
+  const stats = new PlatformStatisticsService(db);
+  await db.sequelize.query('DELETE FROM platform_visit_totals');
+  await db.sequelize.query('DELETE FROM platform_session_dedup');
+  const now = new Date('2026-10-28T12:00:00Z'), id = 'a'.repeat(32);
+  const before = await stats.statistics('7', now);
+  await Promise.all(Array.from({length:5}, () => stats.record('/registro', id, 'human', now)));
+  await stats.record('/', 'b'.repeat(32), 'human', now);
+  await stats.record('/tienda/demo', 'c'.repeat(32), 'human', now);
+  await stats.record('/', 'c'.repeat(32), 'Googlebot', now);
+  await Commerce.create({name:'Platform signup',slug:'signup-'+randomUUID(),active:true,trialStartedAt:now,trialEndsAt:new Date('2026-11-11T12:00:00Z')});
+  const result = await stats.statistics('7', now);
+  assert.equal(result.visits,6); assert.equal(result.registrationViews,5); assert.equal(result.sessions,2);
+  assert.equal(result.storesCreated, before.storesCreated + 1);
+  const [hashes] = await db.sequelize.query('SELECT session_hash FROM platform_session_dedup');
+  assert.equal(hashes.length,2); assert.ok(hashes.every(row => !row.session_hash.includes(id)));
+  await stats.cleanup(new Date(now.getTime() + 49 * 60 * 60 * 1000));
+  const [remaining] = await db.sequelize.query('SELECT session_hash FROM platform_session_dedup');
+  assert.equal(remaining.length,0); assert.equal((await stats.statistics('7',now)).visits,6);
+});
+test('MySQL platform owner codes are one-time, private, and locked after five wrong attempts', async () => {
+  const {PlatformOwnerService} = require('../dist/platform/platform-owner.service');
+  const {OrderEmailService} = require('../dist/catalog/order-email.service');
+  const keys = ['JWT_SECRET','PLATFORM_REGISTRATION_ALERT_EMAIL','RESEND_API_KEY','ORDER_EMAIL_FROM'];
+  const prior = Object.fromEntries(keys.map(k => [k, process.env[k]]));
+  process.env.JWT_SECRET='isolated-test-secret'; process.env.PLATFORM_REGISTRATION_ALERT_EMAIL='owner@example.com';
+  process.env.RESEND_API_KEY='test-only'; process.env.ORDER_EMAIL_FROM='Test <test@example.com>';
+  try {
+    await db.sequelize.query('DELETE FROM platform_owner_codes');
+    let code;
+    mock.method(OrderEmailService.prototype,'sendMessage',async message => {
+      const body=JSON.parse(message); assert.deepEqual(body.to,['owner@example.com']);
+      code=body.text.match(/\b(\d{8})\b/)[1]; return {id:'fake-message-id',retryable:false};
+    });
+    const owner = new PlatformOwnerService(db,new OrderEmailService());
+    await owner.requestCode();
+    let wrong = code === '00000000' ? '11111111' : '00000000';
+    await assert.rejects(owner.verifyCode(wrong),/código no es válido/);
+    const {token} = await owner.verifyCode(code);
+    assert.equal(owner.authorize('Bearer '+token),true);
+    await assert.rejects(owner.verifyCode(code),/código no es válido/);
+    process.env.PLATFORM_REGISTRATION_ALERT_EMAIL='changed@example.com';
+    assert.throws(() => owner.authorize('Bearer '+token),/Ingresá nuevamente/);
+    process.env.PLATFORM_REGISTRATION_ALERT_EMAIL='owner@example.com';
+    await owner.requestCode(); wrong = code === '00000000' ? '11111111' : '00000000';
+    for(let i=0;i<5;i++) await assert.rejects(owner.verifyCode(wrong),/código no es válido/);
+    await assert.rejects(owner.verifyCode(code),/código no es válido/);
+  } finally { for (const k of keys) if (prior[k] === undefined) delete process.env[k]; else process.env[k]=prior[k]; }
 });
 test('MySQL design: branding and logo persist to the public catalog of only the owning commerce',async()=>{
  const {AdminCommerceSettingsService}=require('../dist/catalog/admin-commerce-settings.service');

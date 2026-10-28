@@ -22,7 +22,6 @@ type DashboardData = {
     openOrders:number;
     lowStock:number;
     pendingPayments:number;
-    visits:number;
   };
   salesSeries:Array<{date:string;revenue:number;orders:number}>;
   topProducts:Array<{productId:string;sku:string;name:string;units:number;revenue:number}>;
@@ -121,7 +120,7 @@ export default function AdminDashboardPage(){
         <div>
           <span className="dashboard-kicker">RESUMEN COMERCIAL</span>
           <h1>Dashboard</h1>
-          <p>Visitas, ventas, pedidos, clientes y stock en un solo lugar.</p>
+          <p>Ventas, pedidos, clientes y stock en un solo lugar.</p>
         </div>
         <div className="dashboard-periods">
           {[7,30,90].map(value=>(
@@ -144,11 +143,6 @@ export default function AdminDashboardPage(){
       <PlanSummary />
 
       <section className="dashboard-metrics">
-        <article className="dashboard-metric-card dashboard-visits-card">
-          <span>Visitas a tu tienda</span>
-          <strong>{data?.summary.visits ?? 0}</strong>
-          <small>Una por navegador y día · últimos {days} días</small>
-        </article>
         <article className="dashboard-metric-card">
           <span>Ventas cobradas</span>
           <strong>{money(data?.summary.revenue ?? 0)}</strong>

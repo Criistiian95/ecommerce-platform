@@ -4,13 +4,11 @@ import { Order } from '../database/models/order.model';
 import { OrderItem } from '../database/models/order-item.model';
 import { Product } from '../database/models/product.model';
 import { User } from '../database/models/user.model';
-import { StoreVisitsService } from './store-visits.service';
 
 type Period = 7 | 30 | 90;
 
 @Injectable()
 export class AdminDashboardService {
-  constructor(private readonly visits: StoreVisitsService) {}
   private requireCommerce(commerceId: string | null) {
     if (!commerceId) {
       throw new BadRequestException('El usuario no tiene comercio asociado');
@@ -51,7 +49,7 @@ export class AdminDashboardService {
     const previousEnd = new Date(currentStart);
     previousEnd.setMilliseconds(previousEnd.getMilliseconds() - 1);
 
-    const [currentOrders, previousOrders, recentOrders, lowStockProducts, activeProducts, registeredCustomers, pendingPayments, visitCount] = await Promise.all([
+    const [currentOrders, previousOrders, recentOrders, lowStockProducts, activeProducts, registeredCustomers, pendingPayments] = await Promise.all([
       Order.findAll({
         where: {
           commerceId: id,
@@ -103,7 +101,6 @@ export class AdminDashboardService {
           paymentStatus: 'pending',
         },
       }),
-      this.visits.periodTotal(id, days, now),
     ]);
 
     const paidCurrent = currentOrders.filter(order => order.paymentStatus === 'paid');
@@ -200,7 +197,6 @@ export class AdminDashboardService {
         openOrders,
         lowStock: lowStockProducts.length,
         pendingPayments,
-        visits: visitCount,
       },
       salesSeries: [...seriesMap.entries()].map(([date, values]) => ({
         date,
