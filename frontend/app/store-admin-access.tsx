@@ -9,15 +9,17 @@ export default function StoreAdminAccess() {
   const [label, setLabel] = useState('Acceso para comercios');
 
   useEffect(() => {
-    if (isTenantDomain) {
+    const signedIn = Boolean(localStorage.getItem('ecommerce_token'));
+    // A session created on this subdomain is stored on this origin. Sending
+    // that user to the central host would lose access to their local session.
+    if (isTenantDomain && !signedIn) {
       const origin = (process.env.NEXT_PUBLIC_ADMIN_ORIGIN || 'https://ecommerce-platform-web.onrender.com').replace(/\/$/, '');
       setHref(`${origin}/admin/dashboard`);
       setLabel('Panel del comercio');
       return;
     }
-    const signedIn = Boolean(localStorage.getItem('ecommerce_token'));
     setHref(signedIn ? '/admin/dashboard' : '/login');
-    setLabel(signedIn ? 'Ir al dashboard' : 'Acceso para comercios');
+    setLabel(isTenantDomain ? 'Panel del comercio' : signedIn ? 'Ir al dashboard' : 'Acceso para comercios');
   }, [isTenantDomain, slug]);
 
   return <Link href={href}>{label}</Link>;

@@ -36,6 +36,74 @@ async function fixture(stock = 10) {
   const request = { checkoutKey: randomUUID(), customerName: 'Test', customerEmail: 'test@example.com', customerPhone: '123', deliveryMethod: 'pickup', items: [{ productId: product.id, quantity: 2 }] };
   return { commerce, user, product, checkout, request, preferences: () => preferences };
 }
+test('MySQL: duplicate product SKUs are reported per store, even for concurrent writes', async () => {
+  const a = await fixture(), b = await fixture(), catalog = new CatalogService();
+  const input = { sku: 'SHARED-SKU', name: 'New product', price: 100 };
+  const first = await catalog.createProduct(a.commerce.id, a.user.id, input);
+  const other = await catalog.createProduct(b.commerce.id, b.user.id, input);
+  assert.notEqual(first.id, other.id);
+  const conflict = error => error.getStatus?.() === 409 && /SKU.*comercio/i.test(error.message);
+  await assert.rejects(catalog.createProduct(a.commerce.id, a.user.id, input), conflict);
+  await assert.rejects(catalog.updateProduct(a.commerce.id, first.id, { sku: a.product.sku }), conflict);
+  assert.equal((await Product.findByPk(first.id)).sku, input.sku);
+
+  const race = { ...input, sku: 'CONCURRENT-SKU' };
+  const results = await Promise.allSettled([
+    catalog.createProduct(a.commerce.id, a.user.id, race),
+    catalog.createProduct(a.commerce.id, a.user.id, race),
+  ]);
+  assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
+  const rejected = results.find(result => result.status === 'rejected');
+  assert.ok(rejected && conflict(rejected.reason));
+  assert.equal(await Product.count({ where: { commerceId: a.commerce.id, sku: race.sku } }), 1);
+});
+test('MySQL: store sessions, product images and customization remain isolated', async () => {
+  const bcrypt = require('bcryptjs');
+  const { AuthService } = require('../dist/auth/auth.service');
+  const { AuthGuard } = require('../dist/auth/auth.guard');
+  const { AdminCommerceSettingsService } = require('../dist/catalog/admin-commerce-settings.service');
+  const a = await fixture(), b = await fixture();
+  const password = 'isolated-test-only';
+  const hash = await bcrypt.hash(password, 4);
+  await Promise.all([a.user.update({ passwordHash: hash }), b.user.update({ passwordHash: hash })]);
+  const previousSecret = process.env.JWT_SECRET;
+  process.env.JWT_SECRET = 'isolated-mysql-integration-tests-only';
+  try {
+    const auth = new AuthService(db, {}), guard = new AuthGuard(auth), catalog = new CatalogService();
+    const settings = new AdminCommerceSettingsService();
+    const aLogin = await auth.login(a.user.email, password, a.commerce.slug);
+    const bLogin = await auth.login(b.user.email, password, b.commerce.slug);
+    await assert.rejects(auth.login(a.user.email, password, b.commerce.slug));
+    async function requestFor(token) {
+      const request = { headers: { authorization: `Bearer ${token}` }, method: 'GET', path: '/admin' };
+      assert.equal(await guard.canActivate({ switchToHttp: () => ({ getRequest: () => request }) }), true);
+      return request;
+    }
+    const aRequest = await requestFor(aLogin.token), bRequest = await requestFor(bLogin.token);
+    assert.equal(aRequest.auth.commerceId, a.commerce.id);
+    assert.equal(bRequest.auth.commerceId, b.commerce.id);
+    await assert.rejects(catalog.updateProduct(aRequest.auth.commerceId, b.product.id, { name: 'Other store' }), /no encontrado/);
+
+    const firstImage = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64');
+    const replacementImage = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+    for (const image of [firstImage, replacementImage]) {
+      await catalog.updateProduct(aRequest.auth.commerceId, a.product.id, { imageDataBase64: image.toString('base64'), imageMimeType: 'image/png' });
+      assert.deepEqual((await catalog.getProductImage(a.product.id)).data, image);
+    }
+    await assert.rejects(catalog.getProductImage(b.product.id), /no encontrada/);
+    await settings.updateSettings(aRequest.auth.commerceId, { primaryColor: '#123456', heroTitle: 'Tienda A' });
+    assert.equal((await settings.getSettings(a.commerce.id)).primaryColor, '#123456');
+    assert.notEqual((await settings.getSettings(b.commerce.id)).primaryColor, '#123456');
+
+    assert.equal((await requestFor(aLogin.token)).auth.commerceId, a.commerce.id);
+    await auth.logout(aRequest.auth.sessionId);
+    await assert.rejects(requestFor(aLogin.token));
+    assert.equal((await requestFor(bLogin.token)).auth.commerceId, b.commerce.id);
+  } finally {
+    if (previousSecret === undefined) delete process.env.JWT_SECRET;
+    else process.env.JWT_SECRET = previousSecret;
+  }
+});
 test('MySQL: merchant plan reads only its own subscription and confirmed payment history', async () => {
   const { AdminPlanService } = require('../dist/catalog/admin-plan.service');
   const { BillingSubscription } = require('../dist/database/models/billing-subscription.model');

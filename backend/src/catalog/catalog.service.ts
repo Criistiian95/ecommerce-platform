@@ -1,5 +1,5 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Op } from 'sequelize';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Op, UniqueConstraintError } from 'sequelize';
 import { Category } from '../database/models/category.model';
 import { Product } from '../database/models/product.model';
 import { Commerce } from '../database/models/commerce.model';
@@ -10,6 +10,20 @@ export class CatalogService {
   private requireCommerce(commerceId: string | null) {
     if (!commerceId) throw new ForbiddenException('El usuario no pertenece a un comercio');
     return commerceId;
+  }
+
+  private rethrowProductWriteError(error: unknown): never {
+    if (error instanceof UniqueConstraintError) {
+      const fields = Object.keys(error.fields || {});
+      const databaseMessage = String(error.parent?.message || '');
+      const duplicateSku = fields.includes('uq_products_commerce_sku') ||
+        (fields.includes('sku') && (fields.includes('commerce_id') || fields.includes('commerceId'))) ||
+        /\buq_products_commerce_sku\b/.test(databaseMessage);
+      if (duplicateSku) {
+        throw new ConflictException('Ya existe un producto con ese código SKU en tu comercio. Elegí otro código.');
+      }
+    }
+    throw error;
   }
 
   listCategories(commerceId: string | null) {
@@ -136,28 +150,33 @@ export class CatalogService {
     const initialStock = Math.max(0, Number(input.currentStock ?? 0));
     const uploadedImage = this.decodeImage(input);
 
-    const product = await Product.create({
-      commerceId: cid,
-      categoryId: input.categoryId || null,
-      sku: input.sku.trim(),
-      name: input.name.trim(),
-      description: input.description?.trim() || null,
-      brand: input.brand?.trim() || null,
-      price: Number(input.price),
-      cost: input.cost === undefined || input.cost === null ? null : Number(input.cost),
-      offerPrice:
-        input.offerPrice === undefined || input.offerPrice === null
-          ? null
-          : Number(input.offerPrice),
-      currentStock: initialStock,
-      minimumStock: Math.max(0, Number(input.minimumStock ?? 0)),
-      imageUrl: uploadedImage ? null : (input.imageUrl?.trim() || null),
-      imageData: uploadedImage?.buffer ?? null,
-      imageMimeType: uploadedImage?.mime ?? null,
-      published: input.published ?? true,
-      featured: input.featured ?? false,
-      active: true,
-    });
+    let product: Product;
+    try {
+      product = await Product.create({
+        commerceId: cid,
+        categoryId: input.categoryId || null,
+        sku: input.sku.trim(),
+        name: input.name.trim(),
+        description: input.description?.trim() || null,
+        brand: input.brand?.trim() || null,
+        price: Number(input.price),
+        cost: input.cost === undefined || input.cost === null ? null : Number(input.cost),
+        offerPrice:
+          input.offerPrice === undefined || input.offerPrice === null
+            ? null
+            : Number(input.offerPrice),
+        currentStock: initialStock,
+        minimumStock: Math.max(0, Number(input.minimumStock ?? 0)),
+        imageUrl: uploadedImage ? null : (input.imageUrl?.trim() || null),
+        imageData: uploadedImage?.buffer ?? null,
+        imageMimeType: uploadedImage?.mime ?? null,
+        published: input.published ?? true,
+        featured: input.featured ?? false,
+        active: true,
+      });
+    } catch (error) {
+      this.rethrowProductWriteError(error);
+    }
 
     if (initialStock > 0) {
       await StockMovement.create({
@@ -232,28 +251,32 @@ export class CatalogService {
 
     const uploadedImage = this.decodeImage(input);
 
-    await product.update({
-      ...(input.sku !== undefined ? { sku: input.sku.trim() } : {}),
-      ...(input.name !== undefined ? { name: input.name.trim() } : {}),
-      ...(input.description !== undefined ? { description: input.description?.trim() || null } : {}),
-      ...(input.brand !== undefined ? { brand: input.brand?.trim() || null } : {}),
-      ...(input.price !== undefined ? { price: Number(input.price) } : {}),
-      ...(input.cost !== undefined ? { cost: input.cost === null ? null : Number(input.cost) } : {}),
-      ...(input.offerPrice !== undefined ? { offerPrice: input.offerPrice === null ? null : Number(input.offerPrice) } : {}),
-      ...(input.published !== undefined ? { published: Boolean(input.published) } : {}),
-      ...(input.featured !== undefined ? { featured: Boolean(input.featured) } : {}),
-      ...(input.categoryId !== undefined ? { categoryId: input.categoryId || null } : {}),
-      ...(input.minimumStock !== undefined ? { minimumStock: Number(input.minimumStock) } : {}),
-      ...(uploadedImage
-        ? { imageUrl: null, imageData: uploadedImage.buffer, imageMimeType: uploadedImage.mime }
-        : {}),
-      ...(!uploadedImage && input.imageUrl !== undefined
-        ? { imageUrl: input.imageUrl?.trim() || null }
-        : {}),
-      ...(!uploadedImage && (input.clearUploadedImage || Boolean(input.imageUrl?.trim()))
-        ? { imageData: null, imageMimeType: null }
-        : {}),
-    });
+    try {
+      await product.update({
+        ...(input.sku !== undefined ? { sku: input.sku.trim() } : {}),
+        ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+        ...(input.description !== undefined ? { description: input.description?.trim() || null } : {}),
+        ...(input.brand !== undefined ? { brand: input.brand?.trim() || null } : {}),
+        ...(input.price !== undefined ? { price: Number(input.price) } : {}),
+        ...(input.cost !== undefined ? { cost: input.cost === null ? null : Number(input.cost) } : {}),
+        ...(input.offerPrice !== undefined ? { offerPrice: input.offerPrice === null ? null : Number(input.offerPrice) } : {}),
+        ...(input.published !== undefined ? { published: Boolean(input.published) } : {}),
+        ...(input.featured !== undefined ? { featured: Boolean(input.featured) } : {}),
+        ...(input.categoryId !== undefined ? { categoryId: input.categoryId || null } : {}),
+        ...(input.minimumStock !== undefined ? { minimumStock: Number(input.minimumStock) } : {}),
+        ...(uploadedImage
+          ? { imageUrl: null, imageData: uploadedImage.buffer, imageMimeType: uploadedImage.mime }
+          : {}),
+        ...(!uploadedImage && input.imageUrl !== undefined
+          ? { imageUrl: input.imageUrl?.trim() || null }
+          : {}),
+        ...(!uploadedImage && (input.clearUploadedImage || Boolean(input.imageUrl?.trim()))
+          ? { imageData: null, imageMimeType: null }
+          : {}),
+      });
+    } catch (error) {
+      this.rethrowProductWriteError(error);
+    }
 
     return this.sanitizeProduct(product);
   }

@@ -95,3 +95,14 @@ test('expired session gets a specific message without discarding the product for
   assert.equal(form.resets, 0);
   assert.match(form.toast.text, /Tu sesión venció/);
 });
+
+test('duplicate SKU message is shown without clearing the entered product', async () => {
+  const message = 'Ya existe un producto con ese código SKU en tu comercio. Elegí otro código.';
+  const form = setup(async () => ({
+    ok: false, status: 409, clone: () => ({ json: async () => ({ message }) }),
+  }));
+  await form.submit();
+  assert.equal(form.resets, 0);
+  assert.equal(form.toast.type, 'error');
+  assert.equal(form.toast.text, message);
+});
