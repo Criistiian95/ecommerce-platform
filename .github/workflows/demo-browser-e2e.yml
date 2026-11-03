@@ -1,0 +1,46 @@
+name: Demo de dos comercios
+on:
+  push:
+    branches: [main]
+    paths: ['backend/**', 'frontend/**', '.github/workflows/demo-browser-e2e.yml']
+  pull_request:
+    paths: ['backend/**', 'frontend/**', '.github/workflows/demo-browser-e2e.yml']
+permissions:
+  contents: read
+jobs:
+  isolated-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: local-test-only
+          MYSQL_DATABASE: ecommerce_test_demo_e2e
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -plocal-test-only"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - run: npm ci --prefix backend
+      - run: npm ci --prefix frontend
+      - run: npm run build --prefix backend
+      - name: Preparar navegador aislado
+        run: |
+          npm install --prefix "$RUNNER_TEMP/demo-browser" --no-save --no-package-lock playwright@1.62.1
+          "$RUNNER_TEMP/demo-browser/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Probar dos comercios ficticios
+        run: node frontend/test/demo-browser.e2e.cjs
+        env:
+          NODE_PATH: ${{ runner.temp }}/demo-browser/node_modules
+          TEST_DATABASE_URL: mysql://root:local-test-only@127.0.0.1:3306/ecommerce_test_demo_e2e
