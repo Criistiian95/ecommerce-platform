@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { API_URL } from '../storefront-types';
 import styles from './statistics.module.css';
 
+type IpData = { currentIp: string | null; currentExcluded: boolean; entries: {ip: string; label: string; createdAt: string}[] };
 type Data = { visits: number; sessions: number; registrationViews: number; storesCreated: number; filteredSince?: string | null; ipExcluded?: boolean };
 const TOKEN_KEY = 'disenolys-owner-statistics';
 const periods = [{ value: '7', label: '7 días' }, { value: '30', label: '30 días' },
@@ -13,6 +14,10 @@ export default function StatisticsPage() {
   const [ready, setReady] = useState(false);
   const [token, setToken] = useState('');
   const [period, setPeriod] = useState('30');
+  const [ips, setIps] = useState<IpData | null>(null);
+  const [ip, setIp] = useState('');
+  const [ipLabel, setIpLabel] = useState('');
+  const [ipNotice, setIpNotice] = useState('');
   const [data, setData] = useState<Data | null>(null);
   const [requested, setRequested] = useState(false);
   const [code, setCode] = useState('');
@@ -35,7 +40,12 @@ export default function StatisticsPage() {
       if (request === requestId.current) setData(result);
     } catch { if (request === requestId.current) setError('No pudimos cargar las estadísticas. Intentá nuevamente.'); }
   }, []);
-  useEffect(() => { if (token) void load(token, period); }, [token, period, load]);
+  const loadIps = useCallback(async (currentToken: string) => {
+    const res = await fetch(`${API_URL}/platform/owner/excluded-ips`, { headers: { Authorization: `Bearer ${currentToken}` }, cache: 'no-store' });
+    if (!res.ok) throw new Error('No se pudieron consultar las IP excluidas.');
+    setIps(await res.json());
+  }, []);
+  useEffect(() => { if (token) { void load(token, period); void loadIps(token).catch(() => setError('No pudimos cargar las IP excluidas.')); } }, [token, period, load, loadIps]);
 
   async function requestCode() {
     setBusy(true); setError('');
@@ -58,28 +68,42 @@ export default function StatisticsPage() {
     } catch (e) { setError(e instanceof Error ? e.message : 'No pudimos verificar el código.'); }
     finally { setBusy(false); }
   }
-  async function excludeOwnTraffic() {
-    if (!token || busy) return;
-    setBusy(true); setError('');
+  async function saveIp(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); if (!token || busy) return;
+    setBusy(true); setError(''); setIpNotice('');
     try {
       const key = 'disenolys-platform-browser-id';
       let browserId = localStorage.getItem(key) || '';
       if (!/^[a-f0-9]{32}$/.test(browserId)) {
-        const bytes = new Uint8Array(16);
-        crypto.getRandomValues(bytes);
+        const bytes = new Uint8Array(16); crypto.getRandomValues(bytes);
         browserId = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
         localStorage.setItem(key, browserId);
       }
-      const response = await fetch(API_URL + '/platform/owner/exclude', {
-        method: 'POST', headers: {'Authorization':'Bearer ' + token, 'Content-Type':'application/json'},
-        body: JSON.stringify({sessionId:browserId})
+      const response = await fetch(`${API_URL}/platform/owner/excluded-ips`, {
+        method: 'POST', headers: {Authorization: `Bearer ${token}`, 'Content-Type': 'application/json'},
+        body: JSON.stringify({ip: ip.trim(), label: ipLabel.trim(), browserId})
       });
-      if (!response.ok) throw new Error('No se pudo activar la exclusión.');
-      await load(token, period);
-    } catch (e) { setError(e instanceof Error ? e.message : 'No se pudo excluir este navegador.'); }
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.message || 'No se pudo excluir la IP.');
+      await Promise.all([loadIps(token), load(token, period)]);
+      setIp(''); setIpLabel(''); setIpNotice('IP guardada. Las próximas visitas desde esa conexión no se contarán.');
+    } catch (e) { setError(e instanceof Error ? e.message : 'No se pudo excluir la IP.'); }
     finally { setBusy(false); }
   }
-  function logout() { requestId.current++; try { sessionStorage.removeItem(TOKEN_KEY); } catch {} setToken(''); setData(null); setRequested(false); }
+  async function removeIp(address: string) {
+    if (!token || busy || !window.confirm('¿Dejar de excluir la IP ' + address + '?')) return;
+    setBusy(true); setError(''); setIpNotice('');
+    try {
+      const response = await fetch(`${API_URL}/platform/owner/excluded-ips`, {
+        method: 'DELETE', headers: {Authorization: `Bearer ${token}`, 'Content-Type': 'application/json'},
+        body: JSON.stringify({ip: address})
+      });
+      if (!response.ok) throw new Error('No se pudo quitar la IP.');
+      await loadIps(token); setIpNotice('IP quitada de la lista.');
+    } catch (e) { setError(e instanceof Error ? e.message : 'No se pudo quitar la IP.'); }
+    finally { setBusy(false); }
+  }
+  function logout() { requestId.current++; try { sessionStorage.removeItem(TOKEN_KEY); } catch {} setToken(''); setData(null); setIps(null); setRequested(false); }
 
   return <main className={styles.page}>
     <header className={styles.top}><Link href="/" className={styles.brand}>DISEÑOS <span>L&amp;S</span></Link><span>Panel privado</span>{token && <button onClick={logout}>Cerrar sesión</button>}</header>
@@ -102,12 +126,21 @@ export default function StatisticsPage() {
             ].map(([number, label, value, detail]) => <article className={styles.metric} key={String(number)}><span className={styles.metricNumber}>{number}</span><h3>{label}</h3><strong>{typeof value === 'number' ? value.toLocaleString('es-AR') : '—'}</strong><p>{detail}</p></article>)}
           </section>
           <div className={styles.note}>
-            <strong>Excluir mis visitas</strong>
-            <p>{data?.filteredSince ? 'Tráfico filtrado desde ' + new Date(data.filteredSince).toLocaleString('es-AR') + '. Este navegador está marcado como propio; la IP se excluye solo si Render permite identificarla.' : 'Tus propias pruebas pueden estar incluidas. Activá la exclusión desde este navegador y esta conexión para medir las próximas visitas sin contar las tuyas.'}</p>
-            <p>{data?.filteredSince ? (data.ipExcluded ? 'Filtro de IP activo.' : 'Filtro de navegador activo; IP no identificable con seguridad.') : 'No se puede separar con precisión tu tráfico anterior de las visitas de clientes: al activar el filtro empezará un período nuevo, sin borrar registros históricos.'}</p>
-            <button type="button" disabled={busy} onClick={() => void excludeOwnTraffic()}>{busy ? 'Aplicando…' : data?.filteredSince ? 'Actualizar exclusión de este navegador' : 'Excluir este navegador y mi IP'}</button>
+            <strong>Excluir mis visitas por IP exacta</strong>
+            <p>{ips ? (ips.currentIp ? `IP pública detectada en esta conexión: ${ips.currentIp}${ips.currentExcluded ? ' (en la lista).' : ' (todavía no agregada a la lista).'}` : 'No pudimos identificar de forma segura la IP de esta conexión.') : 'Consultando las IP excluidas…'}</p>
+            {ips?.currentIp && !ips.currentExcluded && <button type="button" onClick={() => setIp(ips.currentIp || '')}>Usar la IP de esta conexión</button>}
+            <form onSubmit={saveIp}>
+              <p><label>IP pública completa <input value={ip} onChange={e => setIp(e.target.value)} placeholder="Ej.: 8.8.8.8" required maxLength={45} /></label></p>
+              <p><label>Nombre para identificarla <input value={ipLabel} onChange={e => setIpLabel(e.target.value)} placeholder="Ej.: Wi-Fi de casa" required maxLength={80} /></label></p>
+              <button type="submit" disabled={busy}>{busy ? 'Guardando…' : 'Agregar IP a la exclusión'}</button>
+            </form>
+            {ipNotice && <p role="status">{ipNotice}</p>}
+            <p>IP excluidas:</p>
+            {ips?.entries.length ? <ul>{ips.entries.map(entry => <li key={entry.ip}>{entry.label}: <strong>{entry.ip}</strong> <button type="button" disabled={busy} onClick={() => void removeIp(entry.ip)}>Quitar</button></li>)}</ul> : <p>Todavía no hay IP agregadas en esta lista.</p>}
+            <p>Solo se excluye la IP completa indicada; cualquier otra persona en la misma conexión también quedará excluida. Si tu proveedor cambia la IP o usás datos móviles, verificá la nueva dirección y agregala. Las IP que agregues quedan guardadas para poder verlas y quitarlas en este panel privado. Al activar por primera vez la exclusión se inicia una nueva referencia para las visitas; los datos históricos no se borran. Las visitas ya registradas no se pueden identificar individualmente.</p>
+            {data?.filteredSince && <p>Filtro anterior activo desde {new Date(data.filteredSince).toLocaleString('es-AR')}; se conserva su configuración.</p>}
           </div>
-          <div className={styles.note}><strong>Cómo leer estos datos</strong><p>Las visitas cuentan las páginas abiertas, incluidas las recargas. Una sesión reúne la actividad de un navegador hasta 30 minutos de inactividad. Son estimaciones: antes de activar la exclusión pueden incluir tus visitas; después solo se excluye el navegador y la IP identificable. Las IP compartidas pueden ocultar otras visitas. Las visitas comienzan a contarse desde la activación; las altas de tiendas incluyen registros anteriores.</p></div>
+          <div className={styles.note}><strong>Cómo leer estos datos</strong><p>Las visitas cuentan las páginas abiertas, incluidas las recargas. Una sesión reúne la actividad de un navegador hasta 30 minutos de inactividad. Son estimaciones: antes de activar la exclusión pueden incluir tus visitas; después se excluyen las IP guardadas y se conserva el filtro anterior si estaba activo. Las IP compartidas pueden ocultar otras visitas. Las visitas comienzan a contarse desde la activación; las altas de tiendas incluyen registros anteriores.</p></div>
         </>}
     </div>
   </main>;

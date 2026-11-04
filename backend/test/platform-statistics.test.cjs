@@ -67,3 +67,54 @@ test('owner exclusion creates one baseline and never erases historical visitor t
   assert.ok(executed.some(sql => sql.includes('INSERT INTO platform_traffic_filter')));
   assert.ok(!executed.some(sql => /DELETE FROM platform_visit_totals/i.test(sql)));
 });
+
+test('exact IP exclusions keep multiple addresses and do not suppress other visitors', async () => {
+  const selected = new Set(['8.8.8.8', '1.1.1.1']);
+  const updates = [];
+  const db = { sequelize: { transaction: async cb => cb({}), query: async (sql, options = {}) => {
+    if (sql.includes('SELECT ip_hash, browser_hash')) return [];
+    if (sql.includes('SELECT ip_address FROM platform_excluded_ips'))
+      return selected.has(options.replacements.address) ? [{ ip_address: options.replacements.address }] : [];
+    if (sql.includes('ROW_COUNT()')) return [{ inserted: 1 }];
+    if (sql.includes('INSERT INTO platform_visit_totals')) updates.push(options.replacements);
+    return [];
+  } } };
+  const service = new PlatformStatisticsService(db);
+  await service.record('/', 'a'.repeat(32), 'human', new Date(), '8.8.8.8');
+  await service.record('/', 'b'.repeat(32), 'human', new Date(), '1.1.1.1');
+  await service.record('/', 'c'.repeat(32), 'human', new Date(), '8.8.8.9');
+  assert.equal(updates.length, 1);
+});
+
+test('adding a second exact IP does not replace existing filters or reset baseline', async () => {
+  const entries = new Map([['8.8.8.8', 'Casa']]);
+  const statements = [];
+  const db = { sequelize: { query: async (sql, options = {}) => {
+    statements.push(sql);
+    if (sql.includes('SELECT id FROM platform_traffic_filter')) return [{ id: 1 }];
+    if (sql.startsWith('INSERT INTO platform_excluded_ips')) entries.set(options.replacements.address, options.replacements.label);
+    return [];
+  } } };
+  const service = new PlatformStatisticsService(db);
+  await service.addExcludedIp('1.1.1.1', 'Celular', 'a'.repeat(32));
+  assert.deepEqual([...entries.keys()], ['8.8.8.8', '1.1.1.1']);
+  assert.ok(!statements.some(sql => /UPDATE platform_traffic_filter|DELETE FROM platform_visit_totals/.test(sql)));
+  await assert.rejects(() => service.addExcludedIp('30.30.100', 'Parcial', 'a'.repeat(32)), /IP pública completa/);
+  await assert.rejects(() => service.addExcludedIp('192.168.0.1', 'Local', 'a'.repeat(32)), /IP pública completa/);
+});
+
+test('IP list and modifications require the platform owner guard', () => {
+  for (const name of ['excludedIps', 'addExcludedIp', 'removeExcludedIp']) {
+    const guards = Reflect.getMetadata(GUARDS_METADATA, PlatformController.prototype[name]);
+    assert.ok(guards.includes(PlatformOwnerGuard));
+  }
+});
+
+test('visit detection uses the Render edge header instead of untrusted X-Forwarded-For', async () => {
+  let actual;
+  const controller = new PlatformController({ record: async (...args) => { actual = args[4]; } }, {});
+  await controller.visit({path:'/',sessionId:'a'.repeat(32)}, 'human', {headers:{'cf-connecting-ip':'1.1.1.1','x-forwarded-for':'8.8.8.8'}});
+  assert.equal(actual, '1.1.1.1');
+  await controller.visit({path:'/',sessionId:'a'.repeat(32)}, 'human', {headers:{'x-forwarded-for':'8.8.8.8'}});
+  assert.equal(actual, undefined);
+});

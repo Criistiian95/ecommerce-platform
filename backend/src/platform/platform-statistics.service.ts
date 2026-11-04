@@ -1,4 +1,4 @@
-import { Injectable, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
+import { BadRequestException, Injectable, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { createHash, createHmac } from 'crypto';
 import { isIP } from 'net';
 import { QueryTypes } from 'sequelize';
@@ -19,11 +19,15 @@ type DailyRow = { page_views: number; sessions: number; register_views: number }
 
 function sessionDigest(id: string) { return createHash('sha256').update(id).digest('hex'); }
 
-// Never store a raw address or browser session ID.
+// Session identifiers and the older single-address filter are stored as digests.
+// Explicit owner exclusions are stored separately as exact addresses.
 export function publicIp(value: unknown): string | null {
   if (typeof value !== 'string') return null;
-  const ip = value.trim().replace(/^::ffff:/i, '').toLowerCase();
+  let ip = value.trim().replace(/^::ffff:/i, '').toLowerCase();
   const family = isIP(ip);
+  if (family === 6) {
+    try { ip = new URL(`http://[${ip}]/`).hostname.slice(1, -1); } catch { return null; }
+  }
   if (family === 4) {
     const [a, b] = ip.split('.').map(Number);
     if (a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) ||
@@ -61,6 +65,7 @@ export class PlatformStatisticsService implements OnApplicationBootstrap, OnModu
     if (typeof path !== 'string' || !pages.has(path) || typeof sessionId !== 'string' ||
         !/^[a-f0-9]{32}$/.test(sessionId) || /bot|crawler|spider|headless|preview|slurp/i.test(userAgent)) return;
     const sessionHash = sessionDigest(sessionId);
+    const address = publicIp(edgeIp);
     const addressHash = ipDigest(edgeIp);
     const browserHash = typeof browserId === 'string' && /^[a-f0-9]{32}$/.test(browserId) ? sessionDigest(browserId) : sessionHash;
     const day = argentinaDay(now);
@@ -69,6 +74,12 @@ export class PlatformStatisticsService implements OnApplicationBootstrap, OnModu
         'SELECT ip_hash, browser_hash FROM platform_traffic_filter WHERE id=1',
         { type: QueryTypes.SELECT, transaction });
       if (excludedVisitor(filter, browserHash, addressHash)) return;
+      if (address) {
+        const [excluded] = await this.db.sequelize.query<{ ip_address: string }>(
+          'SELECT ip_address FROM platform_excluded_ips WHERE ip_address=:address',
+          { replacements: { address }, type: QueryTypes.SELECT, transaction });
+        if (excluded) return;
+      }
       await this.db.sequelize.query('INSERT IGNORE INTO platform_session_dedup(session_hash, started_at) VALUES (:hash, :now)',
         { replacements: { hash: sessionHash, now }, transaction });
       const [row] = await this.db.sequelize.query<{ inserted: number }>('SELECT ROW_COUNT() AS inserted', { type: QueryTypes.SELECT, transaction });
@@ -104,6 +115,40 @@ export class PlatformStatisticsService implements OnApplicationBootstrap, OnModu
       return { active: true, since: new Date(existing.started_at).toISOString(),
         ipExcluded: !!(addressHash || existing.ip_hash) };
     });
+  }
+
+  async excludedIps(edgeIp?: string) {
+    const entries = await this.db.sequelize.query<{ ip_address: string; label: string; created_at: Date }>(
+      'SELECT ip_address, label, created_at FROM platform_excluded_ips ORDER BY created_at, ip_address',
+      { type: QueryTypes.SELECT });
+    const currentIp = publicIp(edgeIp);
+    return { currentIp, currentExcluded: !!currentIp && entries.some(row => row.ip_address === currentIp),
+      entries: entries.map(row => ({ ip: row.ip_address, label: row.label, createdAt: row.created_at })) };
+  }
+
+  async addExcludedIp(ip: unknown, label: unknown, browserId: unknown, now = new Date()) {
+    const address = publicIp(ip);
+    if (!address) throw new BadRequestException('Ingresá una IP pública completa y válida.');
+    if (typeof label !== 'string' || !label.trim() || label.trim().length > 80)
+      throw new BadRequestException('Ingresá un nombre de hasta 80 caracteres.');
+    if (typeof browserId !== 'string' || !/^[a-f0-9]{32}$/.test(browserId))
+      throw new BadRequestException('No se pudo identificar el navegador.');
+    // Keep the original reporting baseline and legacy exclusions intact when present.
+    const [filter] = await this.db.sequelize.query<FilterRow>('SELECT id FROM platform_traffic_filter WHERE id=1',
+      { type: QueryTypes.SELECT });
+    if (!filter) await this.excludeOwner(browserId, undefined, now);
+    await this.db.sequelize.query(
+      'INSERT INTO platform_excluded_ips (ip_address,label,created_at) VALUES (:address,:label,:now) ON DUPLICATE KEY UPDATE label=VALUES(label)',
+      { replacements: { address, label: label.trim(), now } });
+    return { added: true, ip: address };
+  }
+
+  async removeExcludedIp(ip: unknown) {
+    const address = publicIp(ip);
+    if (!address) throw new BadRequestException('IP inválida.');
+    await this.db.sequelize.query('DELETE FROM platform_excluded_ips WHERE ip_address=:address',
+      { replacements: { address } });
+    return { removed: true };
   }
 
   async statistics(period: string | undefined, now = new Date()) {
