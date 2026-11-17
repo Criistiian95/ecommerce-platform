@@ -1,0 +1,55 @@
+name: Prueba aislada de TiDB
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-tidb:
+    if: >-
+      github.repository == 'Criistiian95/ecommerce-platform' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'fix/tidb-tls-20261116'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Detectar configuración de prueba
+        id: gate
+        shell: bash
+        env:
+          TEST_DATABASE: ${{ secrets.TIDB_TEST_DATABASE_URL }}
+        run: |
+          if test -n "$TEST_DATABASE"; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo 'Prueba TiDB no ejecutada: falta la configuración de prueba.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Descargar el código de la rama autorizada
+        if: steps.gate.outputs.ready == 'true'
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Preparar Node
+        if: steps.gate.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Instalar dependencias y compilar
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: backend
+        run: npm ci && npm run build
+
+      - name: Verificar la aplicación con TiDB de prueba
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: backend
+        env:
+          TIDB_TEST_DATABASE_URL: ${{ secrets.TIDB_TEST_DATABASE_URL }}
+        run: node test/tidb-smoke.cjs
