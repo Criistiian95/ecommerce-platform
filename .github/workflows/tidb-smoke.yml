@@ -21,7 +21,7 @@ jobs:
         id: gate
         shell: bash
         env:
-          TEST_DATABASE: ${{ secrets.TIDB_TEST_DATABASE_URL }}
+          TEST_DATABASE: ${{ secrets.TIDB_TEST_CREDENTIALS }}
         run: |
           if test -n "$TEST_DATABASE"; then
             echo 'ready=true' >> "$GITHUB_OUTPUT"
@@ -51,5 +51,5 @@ jobs:
         if: steps.gate.outputs.ready == 'true'
         working-directory: backend
         env:
-          TIDB_TEST_DATABASE_URL: ${{ secrets.TIDB_TEST_DATABASE_URL }}
+          TIDB_TEST_CREDENTIALS: ${{ secrets.TIDB_TEST_CREDENTIALS }}
         run: node test/tidb-smoke.cjs

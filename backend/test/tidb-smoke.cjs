@@ -22,8 +22,20 @@ function validateDestination(value) {
   return value;
 }
 
+function connectionFromCredentials(value) {
+  const lines = value.replace(/\r\n/g, '\n').split('\n');
+  if (lines.length === 3 && lines[2] === '') lines.pop();
+  if (lines.length !== 2 || !lines[0] || lines[0] !== lines[0].trim() || !lines[1]) {
+    throw new Error('Las credenciales de prueba no tienen el formato esperado.');
+  }
+  const destination = new URL(`mysql://${expectedHost}:4000${expectedSchema}`);
+  destination.username = encodeURIComponent(lines[0]);
+  destination.password = encodeURIComponent(lines[1]);
+  return destination.toString();
+}
+
 async function main() {
-  process.env.DATABASE_URL = validateDestination(process.env.TIDB_TEST_DATABASE_URL || '');
+  process.env.DATABASE_URL = validateDestination(connectionFromCredentials(process.env.TIDB_TEST_CREDENTIALS || ''));
   process.env.DATABASE_SSL = 'true';
   process.env.BOOTSTRAP_DEMO = 'false';
   process.env.JWT_SECRET = 'isolated-integration-test-only';
@@ -117,4 +129,4 @@ async function main() {
 }
 
 if (require.main === module) main().catch(() => { console.error('No se pudo iniciar la prueba aislada.'); process.exitCode = 1; });
-module.exports = { validateDestination };
+module.exports = { validateDestination, connectionFromCredentials };
