@@ -36,3 +36,11 @@ Desplegar backend antes del frontend. Conservar las credenciales existentes. Las
 ## Pruebas
 
 `npm test --prefix backend` verifica 27 casos de checkout, transporte y políticas de reintento. `npm run test:mysql --prefix backend` verifica migraciones, concurrencia de stock, atomicidad de confirmación/cola, dos workers simultáneos, recuperación de lease y cierre de ventana de idempotencia con MySQL aislado. Las llamadas de email y pago están simuladas: ninguna prueba envía mensajes ni cobra. El workflow del PR ejecuta ambos grupos y la compilación del frontend.
+
+## Conexión MySQL cifrada
+
+Para un proveedor que requiera TLS, como TiDB Cloud, configurar
+`DATABASE_SSL=true` junto con `DATABASE_URL` en el entorno del servicio. La
+conexión verifica el certificado y la identidad del servidor con las CA de Node.js
+y exige TLS 1.2 o superior. El valor predeterminado conserva el comportamiento de
+las instalaciones existentes; la URL y sus credenciales no deben guardarse aquí.

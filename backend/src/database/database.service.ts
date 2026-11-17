@@ -23,6 +23,10 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   constructor() {
     const url = process.env.DATABASE_URL;
     if (!url) throw new Error('DATABASE_URL is required');
+    const tlsSetting = process.env.DATABASE_SSL?.trim().toLowerCase();
+    if (tlsSetting && tlsSetting !== 'true' && tlsSetting !== 'false') {
+      throw new Error('DATABASE_SSL must be true or false');
+    }
 
     this.sequelize = new Sequelize(url, {
       dialect: 'mysql',
@@ -35,6 +39,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       },
       dialectOptions: {
         connectTimeout: 20000,
+        ...(tlsSetting === 'true' ? {
+          ssl: { minVersion: 'TLSv1.2', rejectUnauthorized: true, verifyIdentity: true },
+        } : {}),
       },
       define: { timestamps: true },
     });
